@@ -15,12 +15,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 //  cabeçalhos (linha 1) da planilha "Cadastro de Bolsista".
 // ---------------------------------------------------------------------
 const MAPEAMENTO: Record<string, string> = {
-  "Nome Completo": "nome",
-  "E-mail": "email",
-  "CPF": "cpf",
-  "RG": "rg",
-  "Órgão Emissor/UF": "orgao_uf",
-  "Chave PIX": "chave_pix",
+  "NOME COMPLETO FORMATADO": "nome",
+  "CPF FORMATADO": "cpf",
+  "TELEFONE FORMATADO": "telefone",
+  "E-MAIL": "email",
 };
 
 const soDigitos = (s: string) => (s || "").replace(/\D/g, "");
@@ -128,7 +126,7 @@ Deno.serve(async () => {
         tipo: "bolsista",
         origem: "google_sheets",
       };
-      for (const campo of ["nome", "email", "rg", "orgao_uf", "chave_pix"]) {
+      for (const campo of ["nome", "email", "telefone", "rg", "orgao_uf", "chave_pix"]) {
         if (idx[campo] !== undefined) {
           pessoa[campo] = (linha[idx[campo]] || "").trim() || null;
         }

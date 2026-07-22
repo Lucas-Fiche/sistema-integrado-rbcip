@@ -10,14 +10,17 @@ Abra `index.ts` e edite o objeto `MAPEAMENTO` para que as chaves batam
 
 ```ts
 const MAPEAMENTO = {
-  "Nome Completo":     "nome",
-  "E-mail":            "email",
-  "CPF":               "cpf",
-  "RG":                "rg",
-  "Órgão Emissor/UF":  "orgao_uf",
-  "Chave PIX":         "chave_pix",
+  "NOME COMPLETO FORMATADO": "nome",
+  "CPF FORMATADO":           "cpf",
+  "TELEFONE FORMATADO":      "telefone",
+  "E-MAIL":                  "email",
 };
 ```
+
+> A planilha atual só traz Nome, CPF, Telefone e E-mail. Os campos `rg`,
+> `orgao_uf` e `chave_pix` de `pessoas` continuam vazios para os bolsistas
+> (serão preenchidos quando a pessoa enviar um formulário). Se a planilha
+> ganhar essas colunas no futuro, basta acrescentá-las ao `MAPEAMENTO`.
 
 ## 2. Criar a Service Account no Google
 

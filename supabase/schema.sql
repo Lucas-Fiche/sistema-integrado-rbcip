@@ -43,6 +43,7 @@ create table if not exists pessoas (
   cpf           text not null unique,            -- somente dígitos
   nome          text not null,
   email         text,
+  telefone      text,
   rg            text,
   orgao_uf      text,
   chave_pix     text,
