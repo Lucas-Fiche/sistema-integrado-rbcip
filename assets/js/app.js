@@ -254,6 +254,7 @@ function ativarFormulario(config) {
     if (btn) { btn.disabled = true; btn.textContent = "Enviando…"; }
 
     try {
+      if (window.rbcipReady) await window.rbcipReady; // aguarda o cliente
       if (window.rbcipDB && window.rbcipDB.configurado) {
         // Envia ao Supabase; guarda cópia local como comprovante
         await window.rbcipDB.salvarSubmissao({ formulario: config.id, dados });
@@ -272,4 +273,9 @@ function ativarFormulario(config) {
       if (btn) { btn.disabled = false; btn.textContent = textoBtn; }
     }
   });
+
+  // Formulários protegidos: exige login e faz o autofill da Seção 1
+  if (config.requerLogin && typeof rbcipProteger === "function") {
+    rbcipProteger(form, config);
+  }
 }

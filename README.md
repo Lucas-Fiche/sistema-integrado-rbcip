@@ -16,10 +16,29 @@ forms/
 assets/
   ├── css/styles.css                Estilo compartilhado
   └── js/
+      ├── config.js                 Credenciais do Supabase
       ├── data.js                   Listas de projetos e bolsistas
       ├── components.js             Seções reutilizáveis (bloco padrão)
+      ├── supabase.js               Cliente Supabase + gravação das respostas
+      ├── auth.js                   Login por CPF, tela de acesso e autofill
       └── app.js                    Máscaras, validação e envio
+supabase/
+  ├── schema.sql                    Tabelas, RLS e trigger (Fases 1–2)
+  ├── schema_fase3.sql              Auth, autofill e regra de login (Fase 3)
+  └── functions/
+      ├── sync-bolsistas/           Sincronização Google Sheets → pessoas
+      └── auth-cpf/                 Login por CPF + código no e-mail
 ```
+
+## Backend e login (Supabase)
+
+- **Respostas** são gravadas na tabela `submissoes`; **pessoas** (bolsistas e
+  não-bolsistas) ficam na tabela `pessoas`. Setup em [`supabase/README.md`](supabase/README.md).
+- **Bolsistas** são sincronizados de um Google Sheets — ver
+  [`supabase/functions/sync-bolsistas/README.md`](supabase/functions/sync-bolsistas/README.md).
+- **Login**: o formulário de **Pagamento é público**; **Reembolso** e as duas
+  **Diárias** exigem login por **CPF + código no e-mail**, e preenchem a Seção 1
+  automaticamente — ver [`supabase/functions/auth-cpf/README.md`](supabase/functions/auth-cpf/README.md).
 
 ## Padronização por seções
 

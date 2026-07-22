@@ -340,6 +340,61 @@ textarea { min-height: 96px; resize: vertical; }
 .success h2 { margin: 0 0 6px; }
 .success p { color: var(--muted); margin: 0 0 18px; }
 
+/* ---------- Barra do usuário logado ---------- */
+.user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--brand-light);
+  border: 1px solid #cfe1ef;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--brand-dark);
+}
+.link-sair {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ---------- Tela de login ---------- */
+.login-panel { max-width: 420px; margin: 8px auto 0; }
+.login-head { text-align: center; margin-bottom: 22px; }
+.login-icon {
+  width: 56px; height: 56px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: var(--brand-light);
+  color: var(--brand);
+  display: grid; place-items: center;
+  font-size: 1.6rem;
+}
+.login-head h2 { margin: 0 0 6px; }
+.login-head p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+.login-step label {
+  display: block;
+  font-weight: 600;
+  margin: 14px 0 4px;
+}
+.login-step .btn { width: 100%; margin-top: 16px; }
+.login-info { color: var(--muted); font-size: 0.9rem; margin: 0 0 4px; }
+.login-msg { color: var(--danger); font-size: 0.85rem; min-height: 1em; margin: 6px 0 0; }
+.link-voltar {
+  appearance: none; border: none; background: none;
+  color: var(--brand); font: inherit; cursor: pointer;
+  text-decoration: underline; display: block;
+  margin: 12px auto 0;
+}
+
 /* ---------- Rodapé ---------- */
 .site-footer {
   text-align: center;

@@ -1,30 +1,38 @@
 /* =============================================================
-   Camada de integração com o Supabase
+   Cliente Supabase compartilhado
    -------------------------------------------------------------
-   Expõe window.rbcipDB. Se as credenciais em config.js não
-   estiverem preenchidas, permanece "não configurado" e o app.js
-   usa o modo local (localStorage + download).
+   Cria uma única instância do cliente (com sessão persistente) e
+   a expõe em window.rbcipSupabase. window.rbcipReady é uma Promise
+   que resolve com o cliente (ou null se não configurado).
    ============================================================= */
 
+window.rbcipSupabase = null;
 window.rbcipDB = { configurado: false };
 
-(async () => {
+window.rbcipReady = (async () => {
   const cfg = window.RBCIP_CONFIG || {};
   const url = cfg.SUPABASE_URL || "";
   const key = cfg.SUPABASE_ANON_KEY || "";
 
   // Ainda com placeholders? Não conecta (mantém modo local).
-  if (!url || !key || url.includes("SUA_") || key.includes("SUA_")) return;
+  if (!url || !key || url.includes("SUA_") || key.includes("SUA_")) return null;
 
   let createClient;
   try {
     ({ createClient } = await import("https://esm.sh/@supabase/supabase-js@2"));
   } catch (err) {
     console.error("Não foi possível carregar o cliente Supabase:", err);
-    return;
+    return null;
   }
 
-  const supabase = createClient(url, key);
+  const supabase = createClient(url, key, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      storageKey: "rbcip-auth",
+    },
+  });
+  window.rbcipSupabase = supabase;
 
   // ----- helpers de extração -----
   function extrairPessoa(dados) {
@@ -34,11 +42,9 @@ window.rbcipDB = { configurado: false };
       cpf: (dados["CPF"] || "").replace(/\D/g, "") || null,
     };
   }
-
   // "1.234,56" -> 1234.56
   function parseValor(dados) {
-    const bruto =
-      dados["Valor"] || dados["Valor Total do Reembolso"] || null;
+    const bruto = dados["Valor"] || dados["Valor Total do Reembolso"] || null;
     if (!bruto) return null;
     const n = Number(String(bruto).replace(/\./g, "").replace(",", "."));
     return Number.isFinite(n) ? n : null;
@@ -46,8 +52,6 @@ window.rbcipDB = { configurado: false };
 
   window.rbcipDB = {
     configurado: true,
-
-    // Insere a submissão. A trigger no banco cuida do cadastro da pessoa.
     async salvarSubmissao({ formulario, dados }) {
       const pessoa = extrairPessoa(dados);
       const registro = {
@@ -59,12 +63,12 @@ window.rbcipDB = { configurado: false };
         valor: parseValor(dados),
         dados,
       };
-      // Sem .select(): o RLS não permite que o público leia submissões,
-      // então não pedimos o registro de volta (evitaríamos um erro no
-      // RETURNING). O insert basta para gravar.
+      // Sem .select(): o RLS não permite leitura pública das submissões.
       const { error } = await supabase.from("submissoes").insert(registro);
       if (error) throw error;
       return true;
     },
   };
+
+  return supabase;
 })();
