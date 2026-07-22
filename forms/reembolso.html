@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Formulário de Reembolso — RBCIP</title>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <p class="brand">Sistema Integrado RBCIP</p>
+    <h1>Formulário de Reembolso</h1>
+  </header>
+
+  <nav class="topbar">
+    <a class="back-link" href="../index.html">← Voltar aos formulários</a>
+  </nav>
+
+  <main class="container">
+    <div class="form-card">
+      <h1>Formulário de Reembolso</h1>
+      <p class="required-note">* Indica uma pergunta obrigatória</p>
+
+      <form id="form" novalidate>
+        <div class="field" data-label="E-mail">
+          <label>E-mail <span class="req">*</span></label>
+          <input type="email" name="email" required />
+          <span class="error"></span>
+        </div>
+
+        <div class="callout">
+          <span class="i">ℹ️</span>
+          <span>Todas as solicitações de reembolso enviadas por este canal possuem prazo
+          para o depósito na chave PIX informada de <strong>5 dias úteis</strong>.</span>
+        </div>
+
+        <div class="field" data-label="Nome Completo">
+          <label>Nome Completo <span class="req">*</span></label>
+          <input type="text" name="nome" required />
+          <span class="error"></span>
+        </div>
+
+        <div class="field" data-label="RG">
+          <label>RG <span class="req">*</span></label>
+          <span class="hint">Por favor, digite APENAS LETRAS E NÚMEROS.</span>
+          <input type="text" name="rg" data-mask="alnum" required />
+          <span class="error"></span>
+        </div>
+
+        <div class="field" data-label="Órgão Emissor / UF" data-validate="orgao-uf">
+          <label>Órgão Emissor / UF <span class="req">*</span></label>
+          <span class="hint">Digite seguindo o formato: SSP/DF</span>
+          <input type="text" name="orgao_uf" placeholder="SSP/DF" required />
+          <span class="error"></span>
+        </div>
+
+        <div class="field" data-label="CPF" data-validate="cpf">
+          <label>CPF <span class="req">*</span></label>
+          <span class="hint">Por favor, digite APENAS NÚMEROS.</span>
+          <input type="text" name="cpf" inputmode="numeric" maxlength="11" data-mask="digits" required />
+          <span class="error"></span>
+        </div>
+
+        <div class="field" data-label="Chave Pix (CPF)">
+          <label>Chave Pix (CPF) <span class="req">*</span></label>
+          <input type="text" name="pix" inputmode="numeric" maxlength="11" data-mask="digits" required />
+          <span class="error"></span>
+        </div>
+
+        <div class="field" data-label="Confirmação Pix" data-required="true">
+          <label>Confirmação Pix <span class="req">*</span></label>
+          <span class="hint">Marque todas que se aplicam.</span>
+          <div class="confirm-box">
+            <label class="option">
+              <input type="checkbox" name="confirmacao_pix" value="Ciente da Portaria nº 1-25" />
+              <span>Estou ciente de que, conforme a Portaria nº 1-25, os pagamentos referentes
+              a este recibo serão realizados exclusivamente por meio de PIX, obrigatoriamente
+              utilizando chave do tipo CPF vinculada ao beneficiário, salvo justificativa
+              apresentada e previamente aprovada.</span>
+            </label>
+          </div>
+          <span class="error"></span>
+        </div>
+
+        <div class="field" data-label="Categoria da Despesa" data-required="true">
+          <label>Categoria da Despesa <span class="req">*</span></label>
+          <span class="hint">Marque todas que se aplicam.</span>
+          <div class="options">
+            <label class="option"><input type="checkbox" name="categoria" value="Alimentação" /><span>Alimentação</span></label>
+            <label class="option"><input type="checkbox" name="categoria" value="Transporte" /><span>Transporte</span></label>
+            <label class="option"><input type="checkbox" name="categoria" value="Material de Escritório" /><span>Material de Escritório</span></label>
+            <label class="option"><input type="checkbox" name="categoria" value="Viagem" /><span>Viagem</span></label>
+            <label class="option">
+              <input type="checkbox" name="categoria" data-other="true" />
+              <span style="flex:1">
+                Outro:
+                <input type="text" class="other-input" placeholder="Especifique" />
+              </span>
+            </label>
+          </div>
+          <span class="error"></span>
+        </div>
+
+        <div class="field" data-label="Descrição do Pagamento">
+          <label>Descrição do Pagamento <span class="req">*</span></label>
+          <textarea name="descricao" required></textarea>
+          <span class="error"></span>
+        </div>
+
+        <div class="field" data-label="Valor Total do Reembolso" data-validate="money">
+          <label>Valor Total do Reembolso <span class="req">*</span></label>
+          <span class="hint">Use vírgula para centavos.</span>
+          <div class="money-wrap">
+            <input type="text" name="valor" inputmode="numeric" data-mask="money" placeholder="0,00" required />
+          </div>
+          <span class="error"></span>
+        </div>
+
+        <div class="field" data-label="Anexar Comprovante/Recibo">
+          <label>Anexar Comprovante/Recibo <span class="req">*</span></label>
+          <span class="hint">Apenas imagens.</span>
+          <input type="file" name="comprovante" accept="image/*" required />
+          <span class="error"></span>
+        </div>
+
+        <div class="field" data-label="Confirmação de Prazo" data-required="true">
+          <label>Confirmação de Prazo <span class="req">*</span></label>
+          <span class="hint">Marque todas que se aplicam.</span>
+          <div class="confirm-box">
+            <label class="option">
+              <input type="checkbox" name="confirmacao_prazo" value="Ciente do prazo de 5 dias úteis" />
+              <span>Estou ciente de que o reembolso será processado em até 5 dias úteis após
+              a aprovação desta solicitação.</span>
+            </label>
+          </div>
+          <span class="error"></span>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">Enviar</button>
+          <button type="reset" class="btn btn-secondary">Limpar</button>
+        </div>
+      </form>
+
+      <div class="success" id="sucesso">
+        <div class="check">✓</div>
+        <h2>Solicitação registrada!</h2>
+        <p>Seu formulário de reembolso foi enviado com sucesso.</p>
+        <div class="actions" style="justify-content:center">
+          <button class="btn btn-secondary" id="baixar">Baixar comprovante (JSON)</button>
+          <a class="btn btn-primary" href="../index.html">Voltar ao início</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">RBCIP · Sistema Integrado de Formulários</footer>
+
+  <script src="../assets/js/data.js"></script>
+  <script src="../assets/js/app.js"></script>
+  <script>
+    ativarFormulario({ id: "reembolso", titulo: "Formulário de Reembolso" });
+  </script>
+</body>
+</html>
