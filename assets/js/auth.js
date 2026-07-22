@@ -171,8 +171,13 @@ function rbcipRenderLogin(form, config) {
       } else {
         msg.textContent = "Não foi possível enviar o código. Tente novamente.";
       }
-    } catch (_) {
-      msg.textContent = "Erro ao enviar o código. Tente novamente.";
+    } catch (e) {
+      const txt = (e && e.message ? e.message : "").toLowerCase();
+      if (txt.includes("security purposes") || txt.includes("rate") || txt.includes("seconds")) {
+        msg.textContent = "Aguarde alguns segundos antes de solicitar um novo código.";
+      } else {
+        msg.textContent = "Erro ao enviar o código. Tente novamente.";
+      }
     } finally {
       btns.forEach((b) => (b.disabled = false));
     }
