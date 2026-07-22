@@ -45,6 +45,7 @@ window.rbcipAuth = {
       body: { acao: "verificar", cpf: soDigitosCpf(cpf), codigo },
     });
     if (error) throw await rbcipDetalharErro(error);
+    console.log("verificar -> vinculadas:", data.vinculadas, "| vinculo_erro:", data.vinculo_erro);
     if (data.ok) {
       await supa.auth.setSession({
         access_token: data.access_token,

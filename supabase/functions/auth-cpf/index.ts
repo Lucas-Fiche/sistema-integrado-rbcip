@@ -94,15 +94,19 @@ Deno.serve(async (req) => {
       }
 
       // Vincula o usuário autenticado ao registro em pessoas
-      await admin
+      const { data: vinc, error: vincErr } = await admin
         .from("pessoas")
         .update({ auth_user_id: data.user.id })
-        .eq("cpf", cpfDig);
+        .eq("cpf", cpfDig)
+        .select("cpf");
+      if (vincErr) console.error("Falha ao vincular auth_user_id:", vincErr);
 
       return json({
         ok: true,
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token,
+        vinculadas: vinc ? vinc.length : 0,
+        vinculo_erro: vincErr ? vincErr.message : null,
       });
     }
 
