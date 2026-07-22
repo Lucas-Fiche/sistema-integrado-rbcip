@@ -165,6 +165,17 @@ create policy "leitura publica de projetos"
   using (ativo = true);
 
 -- ---------------------------------------------------------------------
+-- GRANTs para o papel público (anon)
+--   Necessários porque o RLS é COMPLEMENTAR ao privilégio base: sem o
+--   GRANT, o PostgREST recusa a operação mesmo com a política liberada.
+--   Importante quando "Automatically expose new tables" está DESLIGADO
+--   no projeto (as tabelas criadas via SQL não recebem grant automático).
+-- ---------------------------------------------------------------------
+grant usage  on schema public to anon;
+grant insert on table submissoes to anon;
+grant select on table projetos   to anon;
+
+-- ---------------------------------------------------------------------
 -- Seed inicial dos projetos (mesma lista de assets/js/data.js)
 -- ---------------------------------------------------------------------
 insert into projetos (codigo) values
