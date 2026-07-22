@@ -188,35 +188,24 @@ function ativarFormulario(config) {
     }
   });
 
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    if (!validarFormulario(form)) return;
-
-    const dados = coletarDados(form);
-    const registro = {
-      formulario: config.titulo,
-      enviadoEm: new Date().toISOString(),
-      dados,
-    };
-
-    // Armazena localmente para dar mais controle (histórico no navegador)
+  // Salva no navegador (fallback / histórico local)
+  function salvarLocal(registro) {
     try {
       const chave = "rbcip_" + config.id;
       const hist = JSON.parse(localStorage.getItem(chave) || "[]");
       hist.push(registro);
       localStorage.setItem(chave, JSON.stringify(hist));
     } catch (_) { /* localStorage indisponível */ }
+  }
 
-    // Exibe resumo de sucesso
-    const card = document.querySelector(".form-card");
+  function mostrarSucesso(registro) {
     const sucesso = document.getElementById("sucesso");
-    if (card && sucesso) {
+    if (sucesso) {
       form.style.display = "none";
       sucesso.classList.add("show");
       sucesso.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-
-    // Botão de download do registro em JSON
+    // Botão de download do comprovante em JSON
     const baixar = document.getElementById("baixar");
     if (baixar) {
       baixar.onclick = () => {
@@ -230,6 +219,57 @@ function ativarFormulario(config) {
         a.click();
         URL.revokeObjectURL(url);
       };
+    }
+  }
+
+  function mostrarErro(msg) {
+    let box = document.getElementById("erro-envio");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "erro-envio";
+      box.className = "callout callout-error";
+      form.parentNode.insertBefore(box, form);
+    }
+    box.innerHTML =
+      '<span class="i">⚠️</span><span>' + msg + "</span>";
+    box.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const erroAntigo = document.getElementById("erro-envio");
+    if (erroAntigo) erroAntigo.remove();
+    if (!validarFormulario(form)) return;
+
+    const dados = coletarDados(form);
+    const registro = {
+      formulario: config.titulo,
+      formId: config.id,
+      enviadoEm: new Date().toISOString(),
+      dados,
+    };
+
+    const btn = form.querySelector('button[type="submit"]');
+    const textoBtn = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "Enviando…"; }
+
+    try {
+      if (window.rbcipDB && window.rbcipDB.configurado) {
+        // Envia ao Supabase; guarda cópia local como comprovante
+        await window.rbcipDB.salvarSubmissao({ formulario: config.id, dados });
+        salvarLocal(registro);
+      } else {
+        // Modo local (Supabase ainda não configurado)
+        salvarLocal(registro);
+      }
+      mostrarSucesso(registro);
+    } catch (err) {
+      console.error(err);
+      mostrarErro(
+        "Não foi possível enviar sua solicitação agora. Verifique sua conexão e tente novamente. " +
+        "Se o problema persistir, entre em contato com o suporte."
+      );
+      if (btn) { btn.disabled = false; btn.textContent = textoBtn; }
     }
   });
 }
