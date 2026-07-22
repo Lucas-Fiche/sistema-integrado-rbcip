@@ -12,6 +12,6 @@
    ============================================================= */
 
 window.RBCIP_CONFIG = {
-  SUPABASE_URL: "https://SUA_INSTANCIA.supabase.co",
-  SUPABASE_ANON_KEY: "SUA_CHAVE_ANON",
+  SUPABASE_URL: "https://doqojrrqemvlnpgjrkqu.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_CZ5v2kL9BUn9pVs2V08y5Q_7OlDIQsE",
 };

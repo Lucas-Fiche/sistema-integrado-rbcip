@@ -59,13 +59,12 @@ window.rbcipDB = { configurado: false };
         valor: parseValor(dados),
         dados,
       };
-      const { data, error } = await supabase
-        .from("submissoes")
-        .insert(registro)
-        .select("id")
-        .single();
+      // Sem .select(): o RLS não permite que o público leia submissões,
+      // então não pedimos o registro de volta (evitaríamos um erro no
+      // RETURNING). O insert basta para gravar.
+      const { error } = await supabase.from("submissoes").insert(registro);
       if (error) throw error;
-      return data;
+      return true;
     },
   };
 })();
