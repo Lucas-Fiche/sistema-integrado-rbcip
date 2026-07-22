@@ -7,6 +7,12 @@
 //
 //  IMPORTANTE: publique esta função com "Verify JWT" DESLIGADO
 //  (o usuário ainda não está autenticado ao solicitar/verificar).
+//
+//  Usamos DOIS clientes:
+//   - `db`   : sempre service_role, para ler/gravar em `pessoas`.
+//   - `auth` : para signInWithOtp/verifyOtp. Após verifyOtp esse cliente
+//              passa a agir como o usuário logado, então NUNCA o usamos
+//              para gravar no banco (senão a RLS bloqueia o update).
 // =====================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -34,6 +40,14 @@ function json(obj: unknown, status = 200) {
   });
 }
 
+function novoCliente() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -41,12 +55,10 @@ Deno.serve(async (req) => {
     const { acao, cpf, codigo, email, nome } = await req.json();
     const cpfDig = soDigitos(cpf);
 
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    const db = novoCliente();   // sempre service_role (gravações)
+    const auth = novoCliente(); // apenas autenticação (OTP)
 
-    const { data: pessoa } = await admin
+    const { data: pessoa } = await db
       .from("pessoas")
       .select("cpf,email,nome")
       .eq("cpf", cpfDig)
@@ -60,7 +72,7 @@ Deno.serve(async (req) => {
       if (!emailAlvo) {
         if (!email) return json({ ok: false, motivo: "cpf_nao_encontrado" });
         emailAlvo = email;
-        await admin.from("pessoas").upsert(
+        await db.from("pessoas").upsert(
           {
             cpf: cpfDig,
             nome: nome || email,
@@ -72,7 +84,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      const { error } = await admin.auth.signInWithOtp({
+      const { error } = await auth.auth.signInWithOtp({
         email: emailAlvo,
         options: { shouldCreateUser: true },
       });
@@ -84,7 +96,7 @@ Deno.serve(async (req) => {
     if (acao === "verificar") {
       if (!pessoa?.email) return json({ ok: false, motivo: "cpf_nao_encontrado" });
 
-      const { data, error } = await admin.auth.verifyOtp({
+      const { data, error } = await auth.auth.verifyOtp({
         email: pessoa.email,
         token: soDigitos(codigo),
         type: "email",
@@ -93,8 +105,9 @@ Deno.serve(async (req) => {
         return json({ ok: false, motivo: "codigo_invalido" });
       }
 
-      // Vincula o usuário autenticado ao registro em pessoas
-      const { data: vinc, error: vincErr } = await admin
+      // Grava o vínculo usando `db` (service_role) — NÃO o cliente `auth`,
+      // que agora está autenticado como o usuário e seria barrado pela RLS.
+      const { data: vinc, error: vincErr } = await db
         .from("pessoas")
         .update({ auth_user_id: data.user.id })
         .eq("cpf", cpfDig)
