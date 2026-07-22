@@ -57,10 +57,13 @@ window.rbcipAuth = {
   async meusDados() {
     const supa = await window.rbcipReady;
     if (!supa) return null;
-    const { data } = await supa
+    const { data, error } = await supa
       .from("pessoas")
       .select("nome,email,cpf,telefone,rg,orgao_uf,chave_pix")
       .maybeSingle();
+    if (error) console.error("meusDados erro:", error);
+    const { data: u } = await supa.auth.getUser();
+    console.log("meusDados -> uid:", u?.user?.id, "| registro:", data);
     return data;
   },
 
