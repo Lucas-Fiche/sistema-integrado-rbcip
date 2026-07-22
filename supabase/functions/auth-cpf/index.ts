@@ -108,7 +108,13 @@ Deno.serve(async (req) => {
     return json({ ok: false, motivo: "acao_invalida" }, 400);
   } catch (err) {
     console.error(err);
-    const e = err as { message?: string };
-    return json({ ok: false, erro: e?.message || JSON.stringify(err) }, 500);
+    const e = err as { message?: string; code?: string; status?: number; name?: string };
+    const detalhe =
+      e?.message ||
+      e?.code ||
+      e?.name ||
+      JSON.stringify(err, Object.getOwnPropertyNames(err || {})) ||
+      String(err);
+    return json({ ok: false, erro: detalhe, code: e?.code, status: e?.status }, 500);
   }
 });
