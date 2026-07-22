@@ -135,6 +135,12 @@ Deno.serve(async () => {
       linhas.push(pessoa);
     }
 
+    // 3b. Deduplica por CPF — a última ocorrência na planilha prevalece.
+    //     (evita o erro "ON CONFLICT cannot affect row a second time")
+    const porCpf = new Map<string, Record<string, unknown>>();
+    for (const p of linhas) porCpf.set(p.cpf as string, p);
+    const unicas = Array.from(porCpf.values());
+
     // 4. Upsert em `pessoas` (chave: cpf)
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -142,12 +148,20 @@ Deno.serve(async () => {
     );
     const { error } = await supabase
       .from("pessoas")
-      .upsert(linhas, { onConflict: "cpf" });
+      .upsert(unicas, { onConflict: "cpf" });
     if (error) throw error;
 
-    return Response.json({ ok: true, processados: linhas.length });
+    return Response.json({
+      ok: true,
+      linhas_lidas: linhas.length,
+      pessoas_unicas: unicas.length,
+    });
   } catch (err) {
     console.error(err);
-    return Response.json({ ok: false, erro: String(err) }, { status: 500 });
+    const e = err as { message?: string; details?: string; hint?: string; code?: string };
+    const msg = e?.message
+      ? [e.message, e.details, e.hint, e.code].filter(Boolean).join(" | ")
+      : JSON.stringify(err);
+    return Response.json({ ok: false, erro: msg }, { status: 500 });
   }
 });
