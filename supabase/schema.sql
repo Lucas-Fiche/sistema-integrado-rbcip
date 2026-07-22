@@ -176,6 +176,13 @@ grant usage  on schema public to anon;
 grant insert on table submissoes to anon;
 grant select on table projetos   to anon;
 
+-- O service_role (usado pela Edge Function e pelo dashboard) também
+-- precisa de grant explícito quando "Automatically expose new tables"
+-- está desligado.
+grant select, insert, update, delete on table pessoas    to service_role;
+grant select, insert, update, delete on table submissoes to service_role;
+grant select, insert, update, delete on table projetos   to service_role;
+
 -- ---------------------------------------------------------------------
 -- Seed inicial dos projetos (mesma lista de assets/js/data.js)
 -- ---------------------------------------------------------------------
