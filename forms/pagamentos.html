@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Formulário de Pagamentos — RBCIP</title>
+  <title>Formulário de Pagamento — RBCIP</title>
   <link rel="stylesheet" href="../assets/css/styles.css" />
 </head>
 <body>
   <header class="site-header">
     <p class="brand">Sistema Integrado RBCIP</p>
-    <h1>Formulário de Pagamentos</h1>
+    <h1>Formulário de Pagamento</h1>
   </header>
 
   <nav class="topbar">
@@ -18,56 +18,33 @@
 
   <main class="container">
     <div class="form-card">
-      <h1>Formulário de Pagamentos</h1>
+      <h1>Formulário de Pagamento</h1>
       <p class="required-note">* Indica uma pergunta obrigatória</p>
 
       <form id="form" novalidate>
-        <div class="field" data-label="E-mail">
-          <label>E-mail <span class="req">*</span></label>
-          <input type="email" name="email" required />
-          <span class="error"></span>
-        </div>
+        <!-- Seção 1 – Dados do Colaborador (bloco compartilhado) -->
+        <div id="secao-colaborador"></div>
 
-        <div class="field" data-label="Nome Completo">
-          <label>Nome Completo <span class="req">*</span></label>
-          <input type="text" name="nome" required />
-          <span class="error"></span>
-        </div>
+        <!-- Seção 2 – Detalhes da Atividade -->
+        <section class="form-section">
+          <h2 class="section-title"><span class="num">2</span>Detalhes da Atividade</h2>
 
-        <div class="field" data-label="CPF" data-validate="cpf">
-          <label>CPF <span class="req">*</span></label>
-          <span class="hint">Por favor, APENAS NÚMEROS.</span>
-          <input type="text" name="cpf" inputmode="numeric" maxlength="11" data-mask="digits" required />
-          <span class="error"></span>
-        </div>
-
-        <div class="field" data-label="RG">
-          <label>RG (Opcional)</label>
-          <input type="text" name="rg" />
-          <span class="error"></span>
-        </div>
-
-        <div class="field" data-label="Chave PIX">
-          <label>Chave PIX <span class="req">*</span></label>
-          <input type="text" name="pix" required />
-          <span class="error"></span>
-        </div>
-
-        <div class="field" data-label="Valor" data-validate="money">
-          <label>Valor <span class="req">*</span></label>
-          <span class="hint">Informe o valor total. Use vírgula para centavos.</span>
-          <div class="money-wrap">
-            <input type="text" name="valor" inputmode="numeric" data-mask="money" placeholder="0,00" required />
+          <div class="field" data-label="Valor" data-validate="money">
+            <label>Valor <span class="req">*</span></label>
+            <span class="hint">Informe o valor total. Use vírgula para centavos.</span>
+            <div class="money-wrap">
+              <input type="text" name="valor" inputmode="numeric" data-mask="money" placeholder="0,00" required />
+            </div>
+            <span class="error"></span>
           </div>
-          <span class="error"></span>
-        </div>
 
-        <div class="field" data-label="Descrição Sumária das Atividades">
-          <label>Descrição Sumária das Atividades <span class="req">*</span></label>
-          <span class="hint">Descrição simplificada sobre o serviço prestado.</span>
-          <textarea name="descricao" required></textarea>
-          <span class="error"></span>
-        </div>
+          <div class="field" data-label="Descrição Sumária das Atividades">
+            <label>Descrição Sumária das Atividades <span class="req">*</span></label>
+            <span class="hint">Descrição simplificada sobre o serviço prestado.</span>
+            <textarea name="descricao" required></textarea>
+            <span class="error"></span>
+          </div>
+        </section>
 
         <div class="actions">
           <button type="submit" class="btn btn-primary">Enviar</button>
@@ -90,9 +67,11 @@
   <footer class="site-footer">RBCIP · Sistema Integrado de Formulários</footer>
 
   <script src="../assets/js/data.js"></script>
+  <script src="../assets/js/components.js"></script>
   <script src="../assets/js/app.js"></script>
   <script>
-    ativarFormulario({ id: "pagamentos", titulo: "Formulário de Pagamentos" });
+    montarSecaoColaborador({ nome: "texto" });
+    ativarFormulario({ id: "pagamentos", titulo: "Formulário de Pagamento" });
   </script>
 </body>
 </html>

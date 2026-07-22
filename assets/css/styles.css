@@ -161,6 +161,31 @@ a { color: var(--brand); }
 }
 .back-link:hover { text-decoration: underline; }
 
+/* ---------- Seções ---------- */
+.form-section { margin-bottom: 8px; }
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.05rem;
+  color: var(--brand-dark);
+  margin: 30px 0 18px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--brand-light);
+}
+.form-section:first-of-type .section-title { margin-top: 6px; }
+.section-title .num {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.85rem;
+  display: grid;
+  place-items: center;
+}
+
 /* ---------- Campos ---------- */
 .field { margin-bottom: 22px; }
 .field > label {
