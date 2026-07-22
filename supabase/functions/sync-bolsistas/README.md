@@ -69,16 +69,27 @@ supabase secrets set \
 
 ## 6. Testar manualmente
 
+Use a chave **service_role** (Project Settings → API Keys) no header — ela é
+sempre aceita pelo gateway das funções. **Rode no seu computador** (não
+compartilhe a service_role):
+
 ```bash
-curl -X POST "https://doqojrrqemvlnpgjrkqu.functions.supabase.co/sync-bolsistas" \
-  -H "Authorization: Bearer <SUA_CHAVE_ANON_OU_SERVICE_ROLE>"
+curl -i -X POST "https://doqojrrqemvlnpgjrkqu.supabase.co/functions/v1/sync-bolsistas" \
+  -H "Authorization: Bearer <SERVICE_ROLE_KEY>"
 ```
 Resposta esperada: `{"ok":true,"processados": N}`. Depois, confira em
 **Table Editor → pessoas** os registros com `tipo = 'bolsista'`.
 
+Se der erro:
+- **401 (Invalid JWT)** → em Edge Functions → `sync-bolsistas` → Settings,
+  desligue **Verify JWT** (é uma função interna de sincronização) e teste de novo.
+- **500 com erro do Google** → a planilha não foi compartilhada com o
+  `client_email`, ou o `SHEET_ID` / a chave estão errados.
+- **`processados: 0`** → confira se o `MAPEAMENTO` bate com os cabeçalhos.
+
 ## 7. Agendar (a cada hora)
 
-No **SQL Editor**, habilite as extensões e crie o agendamento (troque o token):
+No **SQL Editor**, habilite as extensões e crie o agendamento (troque a chave):
 
 ```sql
 create extension if not exists pg_cron;
@@ -89,15 +100,22 @@ select cron.schedule(
   '0 * * * *',
   $$
     select net.http_post(
-      url     := 'https://doqojrrqemvlnpgjrkqu.functions.supabase.co/sync-bolsistas',
+      url     := 'https://doqojrrqemvlnpgjrkqu.supabase.co/functions/v1/sync-bolsistas',
       headers := jsonb_build_object(
-        'Authorization', 'Bearer <SUA_CHAVE_ANON_OU_SERVICE_ROLE>',
+        'Authorization', 'Bearer <SERVICE_ROLE_KEY>',
         'Content-Type', 'application/json'
       ),
       body := '{}'::jsonb
     );
   $$
 );
+```
+
+Conferir e acompanhar:
+
+```sql
+select jobid, schedule, jobname from cron.job;                    -- agendamentos ativos
+select * from cron.job_run_details order by start_time desc limit 5;  -- últimas execuções
 ```
 
 Para remover o agendamento: `select cron.unschedule('sync-bolsistas-horario');`
