@@ -1,0 +1,165 @@
+/* =============================================================
+   Dashboard de gestão — RBCIP
+   (complementa styles.css)
+   ============================================================= */
+
+.admin-wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 64px; }
+
+/* Barra superior do dashboard */
+.admin-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.admin-top h1 { margin: 0; font-size: 1.4rem; }
+.admin-user { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; color: var(--muted); }
+
+/* Cartões de resumo */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+.stat .rotulo { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat .valor { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+.stat.tot-valor .valor { color: var(--brand); }
+
+/* Barra de filtros */
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+.filtros .campo { display: flex; flex-direction: column; gap: 4px; }
+.filtros label { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+.filtros input, .filtros select {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 0.9rem;
+  background: #fff;
+}
+.filtros .cresce { flex: 1; min-width: 160px; }
+.filtros input:focus, .filtros select:focus {
+  outline: none; border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(31,95,139,.15);
+}
+
+/* Tabela */
+.tabela-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+}
+table.subs { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+table.subs th, table.subs td {
+  text-align: left;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+table.subs th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  background: #fafbfc;
+  position: sticky; top: 0;
+}
+table.subs tbody tr:hover { background: #f7fafc; }
+table.subs tr.clicavel { cursor: pointer; }
+table.subs tr.clicavel:hover { background: var(--brand-light); }
+.col-valor { text-align: right; font-variant-numeric: tabular-nums; }
+.vazio { padding: 40px; text-align: center; color: var(--muted); }
+
+/* Badges de status */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.badge.pendente    { background:#fff4e5; color:#8a5a00; border-color:#f2d9a8; }
+.badge.em_analise  { background:#e8f1f8; color:#1f5f8b; border-color:#cfe1ef; }
+.badge.aprovado    { background:#e7f6ec; color:#1d7a3f; border-color:#bfe6cc; }
+.badge.rejeitado   { background:#fdecea; color:#c0392b; border-color:#f5c6c2; }
+.badge.pago        { background:#ece9fb; color:#5b3fc0; border-color:#d6cdf3; }
+
+/* Modal de detalhe */
+.modal-bg {
+  position: fixed; inset: 0;
+  background: rgba(20,30,45,.5);
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  overflow-y: auto;
+  z-index: 50;
+}
+.modal-bg.aberto { display: flex; }
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  max-width: 640px;
+  width: 100%;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h2 { margin: 0; font-size: 1.15rem; }
+.modal-fechar { background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--muted); line-height:1; }
+.modal-body { padding: 20px 22px; }
+.det-linha { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+.det-linha .k { flex: 0 0 200px; color: var(--muted); font-size: 0.85rem; }
+.det-linha .v { flex: 1; font-size: 0.92rem; word-break: break-word; }
+.modal-foot {
+  padding: 16px 22px;
+  border-top: 1px solid var(--border);
+  background: #fafbfc;
+}
+.modal-foot .rotulo { font-size: 0.8rem; color: var(--muted); display:block; margin-bottom: 8px; }
+.acoes-status { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-status {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 7px;
+  padding: 7px 12px;
+  font: inherit; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer;
+  transition: all .12s ease;
+}
+.btn-status:hover { border-color: var(--brand); color: var(--brand); }
+.btn-status.ativo { background: var(--brand); color:#fff; border-color: var(--brand); }
+
+/* Login / negado */
+.centro {
+  max-width: 420px; margin: 60px auto; text-align: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px 28px;
+}

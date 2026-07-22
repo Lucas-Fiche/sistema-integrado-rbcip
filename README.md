@@ -22,13 +22,24 @@ assets/
       ├── supabase.js               Cliente Supabase + gravação das respostas
       ├── auth.js                   Login por CPF, tela de acesso e autofill
       └── app.js                    Máscaras, validação e envio
+admin/
+  └── index.html                    Dashboard de gestão (staff)
 supabase/
   ├── schema.sql                    Tabelas, RLS e trigger (Fases 1–2)
   ├── schema_fase3.sql              Auth, autofill e regra de login (Fase 3)
+  ├── schema_dashboard.sql          Papel de staff e RLS do dashboard (Fase 4)
   └── functions/
       ├── sync-bolsistas/           Sincronização Google Sheets → pessoas
       └── auth-cpf/                 Login por CPF + código no e-mail
 ```
+
+## Dashboard de gestão
+
+`admin/index.html` é o painel restrito à equipe: lista as solicitações com
+filtros (formulário, status, período, busca), mostra o detalhe completo de cada
+uma e permite **mudar o status** (pendente → em análise → aprovado/rejeitado/pago),
+além de um resumo com totais e soma de valores. Acesso pelo mesmo login por CPF;
+só entra quem tiver `is_staff = true` em `pessoas` (ver `supabase/schema_dashboard.sql`).
 
 ## Backend e login (Supabase)
 

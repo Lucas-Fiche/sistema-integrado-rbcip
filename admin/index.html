@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard de Gestão — RBCIP</title>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <link rel="stylesheet" href="../assets/css/admin.css" />
+</head>
+<body>
+  <header class="site-header">
+    <p class="brand">Sistema Integrado RBCIP</p>
+    <h1>Dashboard de Gestão</h1>
+  </header>
+
+  <!-- Área de login / acesso -->
+  <div id="area-login"></div>
+
+  <!-- Dashboard (revelado após login de staff) -->
+  <main class="admin-wrap" id="area-dashboard" hidden>
+    <div class="admin-top">
+      <h1>Solicitações</h1>
+      <div class="admin-user">
+        <span id="quem"></span>
+        <button type="button" class="link-sair" id="btn-sair">Sair</button>
+      </div>
+    </div>
+
+    <section class="stats" id="stats"></section>
+
+    <div class="filtros">
+      <div class="campo">
+        <label>Formulário</label>
+        <select id="f-formulario">
+          <option value="">Todos</option>
+          <option value="pagamentos">Pagamento</option>
+          <option value="reembolso">Reembolso</option>
+          <option value="diarias-colaboradores">Diárias — Colaboradores</option>
+          <option value="diarias-bolsistas">Diárias — Bolsistas</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Status</label>
+        <select id="f-status">
+          <option value="">Todos</option>
+          <option value="pendente">Pendente</option>
+          <option value="em_analise">Em análise</option>
+          <option value="aprovado">Aprovado</option>
+          <option value="rejeitado">Rejeitado</option>
+          <option value="pago">Pago</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>De</label>
+        <input type="date" id="f-de" />
+      </div>
+      <div class="campo">
+        <label>Até</label>
+        <input type="date" id="f-ate" />
+      </div>
+      <div class="campo cresce">
+        <label>Buscar (nome, CPF, projeto)</label>
+        <input type="text" id="f-busca" placeholder="Digite para filtrar…" />
+      </div>
+    </div>
+
+    <div class="tabela-wrap">
+      <table class="subs">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Formulário</th>
+            <th>Nome</th>
+            <th>CPF</th>
+            <th>Projeto</th>
+            <th class="col-valor">Valor</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="corpo-tabela"></tbody>
+      </table>
+      <div class="vazio" id="vazio" hidden>Nenhuma solicitação encontrada.</div>
+    </div>
+  </main>
+
+  <!-- Modal de detalhe -->
+  <div class="modal-bg" id="modal-bg">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="modal-titulo">Detalhe da solicitação</h2>
+        <button type="button" class="modal-fechar" id="modal-fechar">×</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-foot">
+        <span class="rotulo">Alterar status:</span>
+        <div class="acoes-status" id="acoes-status"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">RBCIP · Sistema Integrado de Formulários</footer>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/supabase.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/dashboard.js"></script>
+</body>
+</html>

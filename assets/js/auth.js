@@ -60,7 +60,7 @@ window.rbcipAuth = {
     if (!supa) return null;
     const { data, error } = await supa
       .from("pessoas")
-      .select("nome,email,cpf,telefone,rg,orgao_uf,chave_pix")
+      .select("nome,email,cpf,telefone,rg,orgao_uf,chave_pix,is_staff")
       .maybeSingle();
     if (error) console.error("meusDados erro:", error);
     const { data: u } = await supa.auth.getUser();
