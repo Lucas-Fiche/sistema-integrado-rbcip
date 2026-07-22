@@ -9,6 +9,19 @@
 
 const soDigitosCpf = (s) => (s || "").replace(/\D/g, "");
 
+// Extrai o detalhe do erro de uma Edge Function (lê o corpo da resposta)
+async function rbcipDetalharErro(error) {
+  let detalhe = error?.message || String(error);
+  try {
+    if (error?.context && typeof error.context.json === "function") {
+      const corpo = await error.context.json();
+      detalhe += " — " + JSON.stringify(corpo);
+    }
+  } catch (_) { /* corpo não é JSON */ }
+  console.error("auth-cpf erro:", detalhe);
+  return new Error(detalhe);
+}
+
 window.rbcipAuth = {
   async sessao() {
     const supa = await window.rbcipReady;
@@ -22,7 +35,7 @@ window.rbcipAuth = {
     const { data, error } = await supa.functions.invoke("auth-cpf", {
       body: { acao: "solicitar", cpf: soDigitosCpf(cpf), ...extra },
     });
-    if (error) throw error;
+    if (error) throw await rbcipDetalharErro(error);
     return data;
   },
 
@@ -31,7 +44,7 @@ window.rbcipAuth = {
     const { data, error } = await supa.functions.invoke("auth-cpf", {
       body: { acao: "verificar", cpf: soDigitosCpf(cpf), codigo },
     });
-    if (error) throw error;
+    if (error) throw await rbcipDetalharErro(error);
     if (data.ok) {
       await supa.auth.setSession({
         access_token: data.access_token,
