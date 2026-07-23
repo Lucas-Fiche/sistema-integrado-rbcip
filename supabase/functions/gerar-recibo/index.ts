@@ -1,28 +1,26 @@
 // =====================================================================
-//  Edge Function: gerar-recibo
-//  Chamada pela trigger trg_enviar_recibo (pg_net) a cada submissão.
-//  Gera o PDF do recibo (fiel ao texto dos modelos) e envia por e-mail
-//  ao financeiro, com o PDF anexado. Para Reembolso, embute a imagem do
-//  comprovante (Storage) na página 2.
+//  Edge Function: gerar-recibo  (via Google Docs — PDF idêntico)
+//  A cada submissão (trigger), copia o modelo Google Doc, substitui os
+//  <<campos>>, exporta em PDF idêntico e envia por e-mail ao financeiro.
+//  Para Reembolso, anexa também a imagem do comprovante (Storage).
 //
-//  Secrets necessários:
-//    GMAIL_USER, GMAIL_APP_PASSWORD  -> envio (SMTP Gmail/Workspace)
-//    RECIBO_DESTINATARIOS            -> e-mails do financeiro (separados por vírgula)
-//    RECIBO_TOKEN                    -> deve bater com app_config.recibo_token
-//  (SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY já são injetados)
+//  Secrets:
+//    GOOGLE_SA_EMAIL, GOOGLE_SA_PRIVATE_KEY  (mesmos da sync-bolsistas)
+//    DOC_TEMPLATE_PAGAMENTOS, DOC_TEMPLATE_REEMBOLSO,
+//    DOC_TEMPLATE_DIARIAS_COLAB, DOC_TEMPLATE_DIARIAS_BOLS  (IDs dos Docs)
+//    DRIVE_FOLDER_ID          (pasta de destino dos recibos gerados)
+//    GMAIL_USER, GMAIL_APP_PASSWORD, RECIBO_DESTINATARIOS, RECIBO_TOKEN
 //
 //  Publique com "Verify JWT" DESLIGADO.
 // =====================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
-/* ---------------- Valor por extenso ---------------- */
+/* ---------- Valor por extenso ---------- */
 const UNI = ["zero","um","dois","três","quatro","cinco","seis","sete","oito","nove","dez","onze","doze","treze","quatorze","quinze","dezesseis","dezessete","dezoito","dezenove"];
 const DEZ = ["","","vinte","trinta","quarenta","cinquenta","sessenta","setenta","oitenta","noventa"];
 const CEM = ["","cento","duzentos","trezentos","quatrocentos","quinhentos","seiscentos","setecentos","oitocentos","novecentos"];
-
 function porNumero(n: number): string {
   if (n < 20) return UNI[n];
   if (n < 100) return DEZ[Math.floor(n / 10)] + (n % 10 ? " e " + UNI[n % 10] : "");
@@ -37,20 +35,20 @@ function valorExtenso(v: number): string {
   if (c > 0) s += " e " + porNumero(c) + (c === 1 ? " centavo" : " centavos");
   return s;
 }
-
-/* ---------------- Utilidades ---------------- */
 const MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
-function dataExtenso(d = new Date()): string {
-  return `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
-}
-function fmtReais(v: number): string {
-  return "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+const dataExtenso = (d = new Date()) => `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+const fmtNumero = (v: number) => Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtRS = (v: number) => "R$ " + fmtNumero(v);
 const val = (d: Record<string, unknown>, k: string) => {
   const x = d[k];
   if (Array.isArray(x)) return x.join(", ");
-  return x == null || x === "" ? "—" : String(x);
+  return x == null || x === "" ? "" : String(x);
 };
+function toBase64(bytes: Uint8Array): string {
+  let bin = ""; const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  return btoa(bin);
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -59,210 +57,184 @@ const CORS = {
 };
 const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
 
-// Base64 em blocos (evita estouro de pilha com PDFs grandes)
-function toBase64(bytes: Uint8Array): string {
-  let bin = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(bin);
+/* ---------- Autenticação Google (Service Account) ---------- */
+const b64url = (b: Uint8Array | string) =>
+  btoa(typeof b === "string" ? b : String.fromCharCode(...b)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+
+async function importarChave(pem: string): Promise<CryptoKey> {
+  const limpa = pem.replace(/\\n/g, "\n").replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").replace(/\s/g, "");
+  const der = Uint8Array.from(atob(limpa), (c) => c.charCodeAt(0));
+  return await crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+}
+async function tokenGoogle(): Promise<string> {
+  const email = Deno.env.get("GOOGLE_SA_EMAIL")!;
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claim = b64url(JSON.stringify({
+    iss: email,
+    scope: "https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now, exp: now + 3600,
+  }));
+  const unsigned = `${header}.${claim}`;
+  const key = await importarChave(Deno.env.get("GOOGLE_SA_PRIVATE_KEY")!);
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
+  const jwt = `${unsigned}.${b64url(new Uint8Array(sig))}`;
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }),
+  });
+  if (!res.ok) throw new Error("Token Google: " + await res.text());
+  return (await res.json()).access_token;
 }
 
-/* ---------------- Construção do PDF ---------------- */
-const ENDERECO = "Rede Brasileira de Certificação, Pesquisa e Inovação — SBN Qd. 2, Bl. F, Lt. 12, Sala 604, Ed. Via Capital, Brasília/DF · contato@rbcip.org · www.rbcip.org";
-const A4: [number, number] = [595.28, 841.89];
-const MARG = 56;
+/* ---------- Mapa de substituições por formulário ---------- */
+function substituicoes(rec: any): Record<string, string> {
+  const d = rec.dados || {};
+  const numero = String(rec.recibo_numero ?? "");
+  const nome = rec.nome || val(d, "Nome Completo");
+  const cpf = rec.cpf || val(d, "CPF");
+  const valor = Number(rec.valor || 0);
+  const ext = valorExtenso(valor);
+  const data = dataExtenso();
 
-async function novoPdf() {
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const largura = A4[0] - MARG * 2;
-
-  const ctx = {
-    doc, font, bold, largura,
-    page: doc.addPage(A4),
-    y: A4[1] - MARG,
-    quebra(alturaNecessaria = 40) {
-      if (this.y < MARG + alturaNecessaria) { this.page = doc.addPage(A4); this.y = A4[1] - MARG; }
-    },
-    linha(texto: string, o: { size?: number; bold?: boolean; gap?: number; cor?: [number, number, number]; centro?: boolean } = {}) {
-      const size = o.size ?? 11;
-      const f = o.bold ? bold : font;
-      const cor = o.cor ? rgb(...o.cor) : rgb(0.1, 0.1, 0.1);
-      const palavras = texto.split(/\s+/);
-      let atual = "";
-      const linhas: string[] = [];
-      for (const w of palavras) {
-        const teste = atual ? atual + " " + w : w;
-        if (f.widthOfTextAtSize(teste, size) > largura && atual) { linhas.push(atual); atual = w; }
-        else atual = teste;
-      }
-      if (atual) linhas.push(atual);
-      for (const ln of linhas) {
-        this.quebra(size + 6);
-        const x = o.centro ? MARG + (largura - f.widthOfTextAtSize(ln, size)) / 2 : MARG;
-        this.page.drawText(ln, { x, y: this.y, size, font: f, color: cor });
-        this.y -= size + 4;
-      }
-      this.y -= o.gap ?? 6;
-    },
-    espaco(h: number) { this.y -= h; },
-    regua() {
-      this.quebra(20);
-      this.page.drawLine({ start: { x: MARG, y: this.y }, end: { x: A4[0] - MARG, y: this.y }, thickness: 0.7, color: rgb(0.8, 0.8, 0.8) });
-      this.y -= 12;
-    },
+  if (rec.formulario === "pagamentos") {
+    return {
+      "<<Número do Recibo>>": numero,
+      "<<Nome>>": nome,
+      "<<CPF>>": cpf,
+      "<<Descrição Sumária das Atividades>>": val(d, "Descrição Sumária das Atividades"),
+      "<<Valor>>": fmtNumero(valor),
+      "<<Valor por Extenso>>": ext,
+      "<<Chave Pix>>": val(d, "Chave Pix (CPF)"),
+      "<<Data>>": data,
+      "<<Nome Assinatura>>": nome,
+    };
+  }
+  if (rec.formulario === "reembolso") {
+    return {
+      "<<N_Recibo>>": numero,
+      "<<Nome_Completo>>": nome,
+      "<<RG>>": val(d, "RG"),
+      "<<Orgao_Emissor>>": val(d, "Órgão Emissor / UF"),
+      "<<CPF>>": cpf,
+      "<<Valor_Total>>": fmtRS(valor),
+      "<<Valor_Extenso>>": ext,
+      "<<Descricao_Pagamento>>": val(d, "Descrição do Pagamento"),
+      "<<Chave_Pix>>": val(d, "Chave Pix (CPF)"),
+      "<<Data_Atual>>": data,
+      "<<Nome_Assinatura>>": nome,
+      "<<Link Imagem Autocrat>>": "(comprovante anexado ao e-mail)",
+    };
+  }
+  return {
+    "<<Número do Recibo>>": numero,
+    "<<Nome do Bolsista>>": nome,
+    "<<CPF>>": cpf,
+    "<<Cargo/Função>>": val(d, "Cargo/Função"),
+    "<<Email>>": val(d, "Email"),
+    "<<Escolha o Projeto de Referência>>": rec.projeto || val(d, "Projeto de Referência"),
+    "<<Período Inicial>>": val(d, "Período Inicial"),
+    "<<Período Final>>": val(d, "Período Final"),
+    "<<Origem>>": val(d, "Origem (Estado e Município)"),
+    "<<Destino>>": val(d, "Destino (Estado e Município)"),
+    "<<Descrição Sumária das Atividades, Reunião ou Atividades>>": val(d, "Descrição Sumária das Atividades, Reuniões ou Atividades"),
+    "<<Valor>>": fmtRS(valor),
+    "<<Nome Assinatura>>": nome,
   };
-  return ctx;
 }
 
-function cabecalho(p: Awaited<ReturnType<typeof novoPdf>>, titulo: string, numero: string) {
-  p.linha("REDE BRASILEIRA DE CERTIFICAÇÃO, PESQUISA E INOVAÇÃO", { size: 12, bold: true, centro: true, gap: 2 });
-  p.linha("Diretoria Executiva", { size: 10, centro: true, cor: [0.4, 0.4, 0.4], gap: 10 });
-  p.linha(titulo + "  " + numero, { size: 14, bold: true, centro: true, gap: 6, cor: [0.12, 0.37, 0.55] });
-  p.regua();
-}
+const TEMPLATE_ID = (formulario: string) => ({
+  pagamentos: Deno.env.get("DOC_TEMPLATE_PAGAMENTOS"),
+  reembolso: Deno.env.get("DOC_TEMPLATE_REEMBOLSO"),
+  "diarias-colaboradores": Deno.env.get("DOC_TEMPLATE_DIARIAS_COLAB"),
+  "diarias-bolsistas": Deno.env.get("DOC_TEMPLATE_DIARIAS_BOLS"),
+}[formulario]);
 
-function rodape(p: Awaited<ReturnType<typeof novoPdf>>) {
-  p.espaco(14);
-  p.regua();
-  p.linha(ENDERECO, { size: 8, cor: [0.45, 0.45, 0.45], gap: 0 });
-}
-
-function secao(p: Awaited<ReturnType<typeof novoPdf>>, t: string) {
-  p.espaco(4);
-  p.linha(t, { size: 11, bold: true, gap: 4, cor: [0.12, 0.37, 0.55] });
-}
-
-// Monta o conteúdo específico de cada formulário
-function construir(p: Awaited<ReturnType<typeof novoPdf>>, sub: any) {
-  const d = sub.dados || {};
-  const numero = `Nº ${sub.recibo_numero ?? "—"}/${sub.recibo_ano ?? new Date().getFullYear()}`;
-  const valor = Number(sub.valor || 0);
-  const extenso = valorExtenso(valor);
-  const nome = sub.nome || val(d, "Nome Completo");
-  const cpf = sub.cpf || val(d, "CPF");
-
-  if (sub.formulario === "pagamentos") {
-    cabecalho(p, "RECIBO DE PAGAMENTO", numero);
-    secao(p, "1. Informações do Beneficiário");
-    p.linha(`Nome Completo: ${nome}`);
-    p.linha(`CPF: ${cpf}`);
-    p.linha(`Chave PIX: ${val(d, "Chave Pix (CPF)")}`, { gap: 8 });
-    secao(p, "2. Detalhes do Serviço");
-    p.linha(`Eu, ${nome}, portador do CPF nº ${cpf}, recebi da Rede Brasileira de Certificação, Pesquisa e Inovação (RBCIP), CNPJ nº 35.847.316/0001-06, a importância de ${fmtReais(valor)} (${extenso}) referente a ${val(d, "Descrição Sumária das Atividades")}.`, { gap: 10 });
-    p.linha(`Por ser verdade, firmo o presente.`, { gap: 16 });
-    p.linha(`Brasília, ${dataExtenso()}.`, { gap: 26 });
-    p.linha(`_______________________________________`, { gap: 2 });
-    p.linha(nome, { bold: true });
-  } else if (sub.formulario === "reembolso") {
-    cabecalho(p, "RECIBO DE REEMBOLSO", numero);
-    secao(p, "Beneficiário");
-    p.linha(`Nome Completo: ${nome}`);
-    p.linha(`RG: ${val(d, "RG")}  —  Órgão Emissor/UF: ${val(d, "Órgão Emissor / UF")}`);
-    p.linha(`CPF: ${cpf}  —  Chave PIX: ${val(d, "Chave Pix (CPF)")}`, { gap: 8 });
-    secao(p, "Declaração");
-    p.linha(`Eu, ${nome}, portador do RG nº ${val(d, "RG")} ${val(d, "Órgão Emissor / UF")}, e CPF nº ${cpf}, declaro ter recebido nesta data a quantia de ${fmtReais(valor)} (${extenso}) da REDE BRASILEIRA DE CERTIFICAÇÃO, PESQUISA E INOVAÇÃO, CNPJ nº 35.847.316/0001-06, referente à ${val(d, "Descrição do Pagamento")}.`, { gap: 8 });
-    p.linha(`Categoria da despesa: ${val(d, "Categoria da Despesa")}.`, { gap: 8 });
-    p.linha(`Conforme a Portaria nº 1-25, os pagamentos referentes a este recibo serão realizados exclusivamente via PIX, utilizando obrigatoriamente chave CPF vinculada ao beneficiário (${val(d, "Chave Pix (CPF)")}), salvo justificativa apresentada e aprovada previamente.`, { gap: 8 });
-    p.linha(`Declaro, ainda, que não se trata de remuneração, mas sim de reembolso de valores pagos no desempenho das atividades relacionadas à RBCIP, em caráter eventual e sem vínculo empregatício.`, { gap: 8 });
-    p.linha(`Informativo de Pagamento: o prazo para o recebimento do valor descrito acima é de até 5 (cinco) dias úteis a contar da data de emissão deste recibo.`, { gap: 12 });
-    p.linha(`E para maior clareza, firmo o presente.`, { gap: 12 });
-    p.linha(`Brasília, ${dataExtenso()}.`, { gap: 26 });
-    p.linha(`_______________________________________`, { gap: 2 });
-    p.linha(nome, { bold: true });
-    rodape(p);
-    return; // imagem do comprovante é adicionada fora (página 2)
-  } else {
-    const tipo = sub.formulario === "diarias-bolsistas" ? "Bolsista" : "Colaborador";
-    cabecalho(p, "RECIBO DE DIÁRIA", numero + " - " + tipo);
-    secao(p, "1. Informações do Beneficiário");
-    p.linha(`Nome Completo: ${nome}`);
-    p.linha(`CPF: ${cpf}  —  Cargo/Função: ${val(d, "Cargo/Função")}`);
-    p.linha(`E-mail: ${val(d, "Email")}`);
-    p.linha(`Projeto: ${val(d, "Projeto de Referência")}`, { gap: 8 });
-    secao(p, "2. Detalhes do Deslocamento");
-    p.linha(`Período: ${val(d, "Período Inicial")} a ${val(d, "Período Final")}`);
-    p.linha(`Origem: ${val(d, "Origem (Estado e Município)")}  —  Destino: ${val(d, "Destino (Estado e Município)")}`);
-    p.linha(`Justificativa: ${val(d, "Descrição Sumária das Atividades, Reuniões ou Atividades")}`, { gap: 10 });
-    p.linha(`Atesto que recebi da REDE BRASILEIRA DE CERTIFICAÇÃO, PESQUISA E INOVAÇÃO (RBCIP), CNPJ 35.847.316/0001-06, a importância de ${fmtReais(valor)} (${extenso}) em razão do deslocamento mencionado acima.`, { gap: 8 });
-    p.linha(`O reembolso foi calculado em conformidade com a Resolução nº 001/2022 da RBCIP. Conforme a Portaria nº 1-25, os pagamentos serão realizados exclusivamente por meio de PIX vinculado ao CPF do beneficiário, salvo justificativa apresentada e aprovada previamente.`, { gap: 16 });
-    p.linha(`Brasília, ${dataExtenso()}.`, { gap: 26 });
-    p.linha(`_______________________________________`, { gap: 2 });
-    p.linha(nome, { bold: true });
-  }
-  rodape(p);
-}
-
-async function anexarComprovante(p: Awaited<ReturnType<typeof novoPdf>>, db: any, caminho: string) {
-  try {
-    const { data, error } = await db.storage.from("comprovantes").download(caminho);
-    if (error || !data) return;
-    const bytes = new Uint8Array(await data.arrayBuffer());
-    let img;
-    try { img = await p.doc.embedJpg(bytes); } catch { img = await p.doc.embedPng(bytes); }
-    const pg = p.doc.addPage(A4);
-    pg.drawText("Comprovante anexado", { x: MARG, y: A4[1] - MARG, size: 12, font: p.bold, color: rgb(0.12, 0.37, 0.55) });
-    const maxW = A4[0] - MARG * 2, maxH = A4[1] - MARG * 2 - 40;
-    const esc = Math.min(maxW / img.width, maxH / img.height, 1);
-    const w = img.width * esc, h = img.height * esc;
-    pg.drawImage(img, { x: (A4[0] - w) / 2, y: A4[1] - MARG - 30 - h, width: w, height: h });
-  } catch (e) {
-    console.error("Falha ao anexar comprovante:", e);
-  }
-}
-
-/* ---------------- Handler ---------------- */
+/* ---------- Handler ---------- */
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  let docId: string | null = null;
+  let gtoken = "";
   try {
     const { token, record } = await req.json();
     if (token !== Deno.env.get("RECIBO_TOKEN")) return json({ ok: false, erro: "token_invalido" }, 401);
-    if (!record || !record.id) return json({ ok: false, erro: "sem_record" }, 400);
+    if (!record?.id) return json({ ok: false, erro: "sem_record" }, 400);
 
+    const templateId = TEMPLATE_ID(record.formulario);
+    if (!templateId) return json({ ok: false, erro: "template_nao_configurado: " + record.formulario }, 400);
+
+    gtoken = await tokenGoogle();
+    const folderId = Deno.env.get("DRIVE_FOLDER_ID");
+
+    // 1. Copia o modelo
+    const copyResp = await fetch(`https://www.googleapis.com/drive/v3/files/${templateId}/copy`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${gtoken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: `recibo-${record.formulario}-${record.recibo_numero}-${record.recibo_ano}`, parents: folderId ? [folderId] : undefined }),
+    });
+    if (!copyResp.ok) throw new Error("Drive copy: " + await copyResp.text());
+    docId = (await copyResp.json()).id;
+
+    // 2. Substitui os campos
+    const reps = substituicoes(record);
+    const requests = Object.entries(reps).map(([text, replaceText]) => ({
+      replaceAllText: { containsText: { text, matchCase: true }, replaceText: replaceText || "—" },
+    }));
+    const upd = await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${gtoken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ requests }),
+    });
+    if (!upd.ok) throw new Error("Docs batchUpdate: " + await upd.text());
+
+    // 3. Exporta em PDF
+    const exp = await fetch(`https://www.googleapis.com/drive/v3/files/${docId}/export?mimeType=application/pdf`, {
+      headers: { Authorization: `Bearer ${gtoken}` },
+    });
+    if (!exp.ok) throw new Error("Drive export: " + await exp.text());
+    const pdfB64 = toBase64(new Uint8Array(await exp.arrayBuffer()));
+
+    // 4. Monta anexos (PDF + comprovante do reembolso)
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-
-    // Monta o PDF
-    const p = await novoPdf();
-    construir(p, record);
+    const nomeArq = `recibo-${record.formulario}-${record.recibo_numero}-${record.recibo_ano}.pdf`;
+    const anexos: Record<string, unknown>[] = [{ filename: nomeArq, content: pdfB64, encoding: "base64", contentType: "application/pdf" }];
     if (record.formulario === "reembolso") {
       const caminho = record.dados?.["Anexar Comprovante/Recibo"];
-      if (caminho && !/\s/.test(caminho)) await anexarComprovante(p, db, caminho);
+      if (caminho && !/\s/.test(caminho)) {
+        const { data } = await db.storage.from("comprovantes").download(caminho);
+        if (data) anexos.push({ filename: caminho.split("/").pop() || "comprovante", content: toBase64(new Uint8Array(await data.arrayBuffer())), encoding: "base64" });
+      }
     }
-    const pdfBytes = await p.doc.save();
-    const b64 = toBase64(pdfBytes);
 
-    // Envia por e-mail
-    const destinatarios = (Deno.env.get("RECIBO_DESTINATARIOS") || "")
-      .split(",").map((s) => s.trim()).filter(Boolean);
+    // 5. Envia por e-mail
+    const destinatarios = (Deno.env.get("RECIBO_DESTINATARIOS") || "").split(",").map((s) => s.trim()).filter(Boolean);
     if (!destinatarios.length) throw new Error("RECIBO_DESTINATARIOS vazio");
-
-    const nomeArq = `recibo-${record.formulario}-${record.recibo_numero}-${record.recibo_ano}.pdf`;
     const client = new SMTPClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 465,
-        tls: true,
-        auth: { username: Deno.env.get("GMAIL_USER")!, password: Deno.env.get("GMAIL_APP_PASSWORD")! },
-      },
+      connection: { hostname: "smtp.gmail.com", port: 465, tls: true, auth: { username: Deno.env.get("GMAIL_USER")!, password: Deno.env.get("GMAIL_APP_PASSWORD")! } },
     });
     await client.send({
       from: Deno.env.get("GMAIL_USER")!,
       to: destinatarios,
       subject: `Recibo ${record.recibo_numero}/${record.recibo_ano} — ${record.formulario} — ${record.nome || ""}`,
-      content: `Segue em anexo o recibo referente à solicitação de ${record.formulario}.\n\nBeneficiário: ${record.nome || "-"}\nCPF: ${record.cpf || "-"}\nValor: ${fmtReais(Number(record.valor || 0))}\n\nMensagem automática do Sistema Integrado RBCIP.`,
-      attachments: [{ filename: nomeArq, content: b64, encoding: "base64", contentType: "application/pdf" }],
+      content: `Segue em anexo o recibo (${record.formulario}).\nBeneficiário: ${record.nome || "-"}\nCPF: ${record.cpf || "-"}\nValor: ${fmtRS(Number(record.valor || 0))}\n\nMensagem automática do Sistema Integrado RBCIP.`,
+      attachments: anexos as any,
     });
     await client.close();
 
-    // Marca como enviado
+    // 6. Limpa a cópia e marca como enviado
+    await fetch(`https://www.googleapis.com/drive/v3/files/${docId}`, { method: "DELETE", headers: { Authorization: `Bearer ${gtoken}` } });
+    docId = null;
     await db.from("submissoes").update({ recibo_enviado_em: new Date().toISOString() }).eq("id", record.id);
 
     return json({ ok: true, numero: `${record.recibo_numero}/${record.recibo_ano}`, destinatarios });
   } catch (err) {
     console.error(err);
+    // best-effort: remove a cópia se algo falhou depois de criá-la
+    if (docId && gtoken) {
+      try { await fetch(`https://www.googleapis.com/drive/v3/files/${docId}`, { method: "DELETE", headers: { Authorization: `Bearer ${gtoken}` } }); } catch (_) { /* ignora */ }
+    }
     const e = err as { message?: string };
     return json({ ok: false, erro: e?.message || String(err) }, 500);
   }

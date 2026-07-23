@@ -1,61 +1,66 @@
-# Fase 5 — Recibo automático + envio ao financeiro
+# Fase 5 — Recibo idêntico (Google Docs) + envio ao financeiro
 
 A cada submissão, a trigger `trg_enviar_recibo` chama esta Edge Function, que:
-1. numera o recibo (sequencial por ano),
-2. gera o PDF (fiel ao texto dos modelos, com valor por extenso),
-3. para Reembolso, embute a imagem do comprovante (Storage),
-4. envia por e-mail ao financeiro com o PDF anexado,
-5. marca `submissoes.recibo_enviado_em`.
+1. copia o **modelo Google Doc** correspondente ao formulário,
+2. substitui os `<<campos>>` pelos valores (numera o recibo, valor por extenso),
+3. **exporta em PDF idêntico** ao modelo,
+4. envia por e-mail ao financeiro (Reembolso vai com o comprovante anexado),
+5. apaga a cópia temporária e marca `submissoes.recibo_enviado_em`.
 
 ## 1. Banco
 
-Rode `supabase/schema_recibo.sql` no SQL Editor. Depois defina um token próprio
-(o mesmo valor será usado como secret da função):
-
+Rode `supabase/schema_recibo.sql` (já feito) e defina o token:
 ```sql
-update app_config set valor = 'UM_TOKEN_SECRETO_QUALQUER' where chave = 'recibo_token';
+update app_config set valor = 'SEU_TOKEN' where chave = 'recibo_token';
 ```
 
-## 2. Publicar a função (Verify JWT DESLIGADO)
+## 2. Setup no Google (uma vez)
 
-- Painel: Edge Functions → nova função `gerar-recibo` → cole o `index.ts` →
-  em Settings, **desligue Verify JWT**.
-- CLI: `supabase functions deploy gerar-recibo --no-verify-jwt`
+1. **Google Cloud Console** (mesmo projeto da Service Account do Sheets) →
+   **APIs & Services → Library** → habilite **Google Docs API** e **Google Drive API**.
+2. Faça upload dos 4 DOCX no **Google Drive** e **abra cada um como Google Docs**
+   (Arquivo → Salvar como Documentos Google), criando 4 Google Docs.
+3. Crie uma **pasta** no Drive para os recibos gerados.
+4. **Compartilhe** com o e-mail da Service Account (`...@...iam.gserviceaccount.com`):
+   - os 4 modelos (permissão **Leitor**),
+   - a pasta de destino (permissão **Editor**).
+5. Anote os **IDs**: do trecho `/document/d/`**`ID`**`/edit` (modelos) e
+   `/folders/`**`ID`** (pasta).
 
-## 3. Secrets da função
+## 3. Publicar a função (Verify JWT DESLIGADO)
 
-Em Edge Functions → `gerar-recibo` → Secrets:
+- Painel: Edge Functions → `gerar-recibo` → aba **Code** → cole o `index.ts` → **Deploy**.
+- Settings → **desligue Verify JWT**.
+
+## 4. Secrets
+
+Reaproveita os do Google (já configurados na `sync-bolsistas`) e adiciona os IDs:
 
 | Secret | Valor |
 |---|---|
-| `GMAIL_USER` | o e-mail @rbcip.org usado no SMTP |
-| `GMAIL_APP_PASSWORD` | a **mesma senha de app** já criada para o SMTP do login |
-| `RECIBO_DESTINATARIOS` | e-mails do financeiro separados por vírgula. **Por enquanto:** `lucas.fiche.u.borges@gmail.com` |
-| `RECIBO_TOKEN` | o **mesmo** valor definido em `app_config.recibo_token` |
+| `GOOGLE_SA_EMAIL` | (já existe) e-mail da Service Account |
+| `GOOGLE_SA_PRIVATE_KEY` | (já existe) chave privada |
+| `DOC_TEMPLATE_PAGAMENTOS` | ID do Google Doc do modelo de Pagamento |
+| `DOC_TEMPLATE_REEMBOLSO` | ID do modelo de Reembolso |
+| `DOC_TEMPLATE_DIARIAS_COLAB` | ID do modelo de Diária — Colaborador |
+| `DOC_TEMPLATE_DIARIAS_BOLS` | ID do modelo de Diária — Bolsista |
+| `DRIVE_FOLDER_ID` | ID da pasta de destino |
+| `GMAIL_USER`, `GMAIL_APP_PASSWORD` | envio (já configurados) |
+| `RECIBO_DESTINATARIOS` | e-mails do financeiro (por vírgula) |
+| `RECIBO_TOKEN` | igual ao `app_config.recibo_token` |
 
-(`SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já são injetados.)
+## 5. Testar
 
-## 4. Testar
+Envie um formulário e confira o e-mail: o PDF deve estar **idêntico ao modelo**.
 
-1. Envie qualquer formulário (ex.: Pagamento — é público).
-2. Confira o e-mail do destinatário: deve chegar com o PDF anexado.
-3. No banco: `select recibo_numero, recibo_ano, recibo_enviado_em from submissoes order by criado_em desc limit 1;` — `recibo_enviado_em` deve estar preenchido.
-
-### Diagnóstico
-- **Nada chegou** → veja Edge Functions → `gerar-recibo` → Logs. Erros comuns:
-  - `token_invalido` → `RECIBO_TOKEN` ≠ `app_config.recibo_token`.
-  - erro de SMTP → conferir `GMAIL_USER`/`GMAIL_APP_PASSWORD`.
-  - `RECIBO_DESTINATARIOS vazio` → definir o secret.
-- **Reembolso sem a imagem** → o comprovante precisa ter sido enviado ao Storage
-  (formulário atualizado) e o caminho salvo em `dados`.
-
-## Quando tiver os 3 e-mails do financeiro
-
-Basta atualizar o secret `RECIBO_DESTINATARIOS` para
-`fin1@rbcip.org, fin2@rbcip.org, fin3@rbcip.org` — sem mexer no código.
+### Diagnóstico (Logs da função)
+- `template_nao_configurado` → falta o secret do ID daquele formulário.
+- `Drive copy: ... 404/403` → o modelo/pasta não foi compartilhado com a Service Account, ou o ID está errado.
+- `Token Google: ...` → APIs não habilitadas ou chave inválida.
+- erro de SMTP → conferir `GMAIL_USER`/`GMAIL_APP_PASSWORD`.
 
 ## Observações
-- O envio usa Gmail/Workspace (limites de envio se aplicam). Para volume/produção,
-  dá para migrar a um serviço transacional depois.
-- O recibo é gerado **no envio** do formulário. Se preferir gerar só após a
-  aprovação no dashboard, dá para mudar o gatilho.
+- A substituição usa a **API do Docs** (opera sobre o texto), então funciona mesmo
+  que o modelo tivesse marcadores "quebrados" no DOCX.
+- O comprovante do Reembolso vai **anexado ao e-mail** (o texto do marcador é
+  substituído por uma nota). Se preferir a imagem **dentro** do PDF, dá para evoluir depois.
