@@ -15,9 +15,13 @@ create table if not exists recibo_contador (
   ultimo int not null default 0
 );
 
+-- SECURITY DEFINER: escreve no contador mesmo com RLS ativo e sem grants
+-- para os papéis públicos (o INSERT do formulário chama isto via trigger).
 create or replace function fn_proximo_recibo(p_ano int)
 returns int
 language plpgsql
+security definer
+set search_path = public
 as $$
 declare n int;
 begin
@@ -27,6 +31,11 @@ begin
   return n;
 end;
 $$;
+
+-- Protege o contador: RLS ligado e sem políticas = nenhum acesso por
+-- anon/authenticated. A função SECURITY DEFINER e o service_role continuam
+-- operando normalmente.
+alter table recibo_contador enable row level security;
 
 -- 3. Numera o recibo no momento do INSERT
 create or replace function fn_numerar_recibo()
@@ -53,6 +62,10 @@ create table if not exists app_config (
 insert into app_config (chave, valor)
 values ('recibo_token', 'TROQUE_ESTE_TOKEN')
 on conflict (chave) do nothing;
+
+-- app_config guarda o token: protege com RLS (sem políticas = sem acesso
+-- por anon/authenticated; as funções definer e o service_role seguem lendo).
+alter table app_config enable row level security;
 
 -- 5. Ao inserir a submissão, chama a Edge Function que gera e envia o recibo
 create extension if not exists pg_net;
