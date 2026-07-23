@@ -14,6 +14,15 @@ create policy "usuario le seu registro"
   to authenticated
   using (auth_user_id = auth.uid());
 
+-- Também permite ler o próprio registro pelo e-mail do login (robusto:
+-- funciona mesmo quando auth_user_id ainda não foi vinculado, ex.: login
+-- por senha no dashboard).
+drop policy if exists "usuario le por email" on pessoas;
+create policy "usuario le por email"
+  on pessoas for select
+  to authenticated
+  using (lower(email) = lower(auth.jwt() ->> 'email'));
+
 grant usage  on schema public to authenticated;
 grant select on table pessoas to authenticated;
 

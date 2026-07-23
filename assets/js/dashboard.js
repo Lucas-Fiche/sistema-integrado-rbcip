@@ -54,11 +54,17 @@ async function init() {
 
   const dados = await window.rbcipAuth.meusDados();
   if (!dados || !dados.is_staff) {
+    const { data: u } = await supa.auth.getUser();
+    const uid = (u && u.user && u.user.id) || "—";
+    const mail = (u && u.user && u.user.email) || "—";
+    const lido = dados ? "sim (is_staff=" + dados.is_staff + ")" : "não (RLS não retornou registro)";
     areaLogin.innerHTML =
       '<div class="centro"><div class="login-icon">⛔</div>' +
       "<h2>Acesso restrito</h2>" +
-      '<p class="form-intro">Sua conta não tem permissão de gestão. Fale com o administrador.</p>' +
-      '<button type="button" class="btn btn-secondary" id="btn-sair2" style="margin-top:16px">Sair</button></div>';
+      '<p class="form-intro">Sua conta não tem permissão de gestão.</p>' +
+      '<div style="text-align:left;font-size:.8rem;color:var(--muted);background:#f7fafc;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:14px 0">' +
+      "<b>Diagnóstico</b><br>Logado como: " + mail + "<br>uid: " + uid + "<br>Registro lido: " + lido + "</div>" +
+      '<button type="button" class="btn btn-secondary" id="btn-sair2">Sair</button></div>';
     document.getElementById("btn-sair2").onclick = () => window.rbcipAuth.sair();
     return;
   }
