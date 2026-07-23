@@ -52,6 +52,15 @@ window.rbcipReady = (async () => {
 
   window.rbcipDB = {
     configurado: true,
+    // Sobe um arquivo (ex.: comprovante) ao Storage e devolve o caminho
+    async uploadArquivo(file) {
+      const nome = Date.now() + "-" + file.name.replace(/[^\w.\-]/g, "_");
+      const { data, error } = await supabase.storage
+        .from("comprovantes")
+        .upload(nome, file, { upsert: false });
+      if (error) throw error;
+      return data.path;
+    },
     async salvarSubmissao({ formulario, dados }) {
       const pessoa = extrairPessoa(dados);
       const registro = {

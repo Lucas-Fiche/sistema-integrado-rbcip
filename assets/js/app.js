@@ -256,6 +256,17 @@ function ativarFormulario(config) {
     try {
       if (window.rbcipReady) await window.rbcipReady; // aguarda o cliente
       if (window.rbcipDB && window.rbcipDB.configurado) {
+        // Sobe anexos (ex.: comprovante do Reembolso) ao Storage
+        if (window.rbcipDB.uploadArquivo) {
+          for (const inp of form.querySelectorAll('input[type="file"]')) {
+            if (inp.files && inp.files[0]) {
+              const campo = inp.closest(".field");
+              const label = (campo && campo.dataset.label) || "Anexo";
+              try { dados[label] = await window.rbcipDB.uploadArquivo(inp.files[0]); }
+              catch (e) { console.error("upload do anexo falhou:", e); }
+            }
+          }
+        }
         // Envia ao Supabase; guarda cópia local como comprovante
         await window.rbcipDB.salvarSubmissao({ formulario: config.id, dados });
         salvarLocal(registro);

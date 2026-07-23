@@ -28,10 +28,19 @@ supabase/
   ├── schema.sql                    Tabelas, RLS e trigger (Fases 1–2)
   ├── schema_fase3.sql              Auth, autofill e regra de login (Fase 3)
   ├── schema_dashboard.sql          Papel de staff e RLS do dashboard (Fase 4)
+  ├── schema_recibo.sql             Numeração, gatilho de envio e Storage (Fase 5)
   └── functions/
       ├── sync-bolsistas/           Sincronização Google Sheets → pessoas
-      └── auth-cpf/                 Login por CPF + código no e-mail
+      ├── auth-cpf/                 Login por CPF + código no e-mail
+      └── gerar-recibo/             Gera o PDF do recibo e envia ao financeiro
 ```
+
+## Recibo automático
+
+A cada submissão, uma trigger chama a Edge Function `gerar-recibo`, que numera o
+recibo, monta o **PDF** (fiel ao texto dos 4 modelos, com valor por extenso; no
+Reembolso embute o comprovante do Storage) e **envia por e-mail ao financeiro**
+com o anexo. Setup em [`supabase/functions/gerar-recibo/README.md`](supabase/functions/gerar-recibo/README.md).
 
 ## Dashboard de gestão
 
