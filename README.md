@@ -38,8 +38,10 @@ supabase/
 `admin/index.html` é o painel restrito à equipe: lista as solicitações com
 filtros (formulário, status, período, busca), mostra o detalhe completo de cada
 uma e permite **mudar o status** (pendente → em análise → aprovado/rejeitado/pago),
-além de um resumo com totais e soma de valores. Acesso pelo mesmo login por CPF;
-só entra quem tiver `is_staff = true` em `pessoas` (ver `supabase/schema_dashboard.sql`).
+além de um resumo com totais e soma de valores. O acesso é por **e-mail + senha**
+(só admins têm conta); só entra quem tiver `is_staff = true` em `pessoas`, e a
+restrição é garantida por RLS. Setup e provisionamento de admins em
+[`admin/README.md`](admin/README.md).
 
 ## Backend e login (Supabase)
 

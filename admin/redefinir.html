@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Definir senha — RBCIP</title>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <link rel="stylesheet" href="../assets/css/admin.css" />
+</head>
+<body>
+  <header class="site-header">
+    <p class="brand">Sistema Integrado RBCIP</p>
+    <h1>Definir senha</h1>
+  </header>
+
+  <div class="admin-wrap">
+    <div class="form-card" style="max-width:440px;margin:0 auto">
+      <div class="login-panel">
+        <div id="conteudo">
+          <p class="form-intro">Carregando…</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">RBCIP · Sistema Integrado de Formulários</footer>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/supabase.js"></script>
+  <script>
+    (async () => {
+      const supa = await window.rbcipReady;
+      const alvo = document.getElementById("conteudo");
+      if (!supa) {
+        alvo.innerHTML = '<p class="login-msg">Supabase não configurado.</p>';
+        return;
+      }
+      // O link de recuperação cria uma sessão temporária (detectada na URL)
+      const { data } = await supa.auth.getSession();
+      if (!data.session) {
+        alvo.innerHTML =
+          '<div class="login-head"><div class="login-icon">⚠️</div>' +
+          "<h2>Link inválido ou expirado</h2>" +
+          '<p>Solicite um novo link em <a href="index.html">Painel de Gestão</a>.</p></div>';
+        return;
+      }
+
+      alvo.innerHTML = `
+        <div class="login-head"><div class="login-icon">🔑</div>
+          <h2>Defina sua senha</h2>
+          <p>Escolha uma senha para acessar o painel.</p></div>
+        <div class="login-step">
+          <label>Nova senha</label>
+          <input type="password" id="s1" placeholder="Mínimo de 6 caracteres" />
+          <label>Confirmar senha</label>
+          <input type="password" id="s2" />
+          <p class="login-msg" id="msg"></p>
+          <button type="button" class="btn btn-primary" id="salvar">Salvar senha</button>
+        </div>`;
+
+      const msg = document.getElementById("msg");
+      document.getElementById("salvar").onclick = async () => {
+        msg.textContent = "";
+        const s1 = document.getElementById("s1").value;
+        const s2 = document.getElementById("s2").value;
+        if (s1.length < 6) { msg.textContent = "A senha deve ter ao menos 6 caracteres."; return; }
+        if (s1 !== s2) { msg.textContent = "As senhas não conferem."; return; }
+        const btn = document.getElementById("salvar");
+        btn.disabled = true;
+        const { error } = await supa.auth.updateUser({ password: s1 });
+        if (error) {
+          msg.textContent = "Não foi possível salvar. Tente novamente.";
+          btn.disabled = false;
+          return;
+        }
+        alvo.innerHTML =
+          '<div class="login-head"><div class="login-icon">✅</div>' +
+          "<h2>Senha definida!</h2><p>Redirecionando para o painel…</p></div>";
+        setTimeout(() => (location.href = "index.html"), 1500);
+      };
+    })();
+  </script>
+</body>
+</html>

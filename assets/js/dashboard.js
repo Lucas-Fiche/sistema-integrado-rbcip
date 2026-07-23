@@ -73,76 +73,70 @@ async function init() {
   await carregar();
 }
 
-/* ---------- Login de staff ---------- */
+/* ---------- Login de staff (e-mail + senha) ---------- */
 function renderLogin(area) {
   area.innerHTML = `
     <div class="admin-wrap"><div class="form-card">
       <div class="login-panel">
         <div class="login-head">
           <div class="login-icon">🔒</div>
-          <h2>Acesso da equipe</h2>
-          <p>Entre com seu CPF para acessar o painel de gestão.</p>
+          <h2>Painel de Gestão</h2>
+          <p>Acesso restrito à equipe.</p>
         </div>
-        <div class="login-step" data-step="cpf">
-          <label>CPF</label>
-          <input type="text" id="d-cpf" inputmode="numeric" maxlength="11" placeholder="Somente números" />
-          <p class="login-msg" id="d-msg-cpf"></p>
-          <button type="button" class="btn btn-primary" id="d-enviar">Enviar código</button>
-        </div>
-        <div class="login-step" data-step="codigo" hidden>
-          <p class="login-info" id="d-enviado"></p>
-          <label>Código recebido</label>
-          <input type="text" id="d-codigo" inputmode="numeric" placeholder="Digite o código" />
-          <p class="login-msg" id="d-msg-cod"></p>
+        <div class="login-step">
+          <label>E-mail</label>
+          <input type="email" id="d-email" placeholder="voce@rbcip.org" />
+          <label>Senha</label>
+          <input type="password" id="d-senha" placeholder="Sua senha" />
+          <p class="login-msg" id="d-msg"></p>
           <button type="button" class="btn btn-primary" id="d-entrar">Entrar</button>
+          <button type="button" class="link-voltar" id="d-esqueci">Esqueci / definir minha senha</button>
+          <p class="login-info" id="d-info"></p>
         </div>
       </div>
     </div></div>`;
 
-  const cpf = area.querySelector("#d-cpf");
-  cpf.addEventListener("input", () => { cpf.value = cpf.value.replace(/\D/g, ""); });
+  const email = area.querySelector("#d-email");
+  const senha = area.querySelector("#d-senha");
+  const msg = area.querySelector("#d-msg");
+  const info = area.querySelector("#d-info");
 
-  area.querySelector("#d-enviar").onclick = async () => {
-    const msg = area.querySelector("#d-msg-cpf");
-    msg.textContent = "";
-    if (cpf.value.length !== 11) { msg.textContent = "Digite um CPF válido (11 números)."; return; }
-    const btn = area.querySelector("#d-enviar");
-    btn.disabled = true;
-    try {
-      const r = await window.rbcipAuth.solicitarCodigo(cpf.value);
-      if (r.ok) {
-        area.querySelector("#d-enviado").textContent =
-          "Enviamos um código para " + (r.email_mascarado || "seu e-mail") + ".";
-        area.querySelector('[data-step="cpf"]').hidden = true;
-        area.querySelector('[data-step="codigo"]').hidden = false;
-      } else {
-        msg.textContent = r.motivo === "cpf_nao_encontrado"
-          ? "CPF não encontrado no sistema."
-          : "Não foi possível enviar o código.";
-      }
-    } catch (e) {
-      const t = (e && e.message ? e.message : "").toLowerCase();
-      msg.textContent = t.includes("seconds") || t.includes("security")
-        ? "Aguarde alguns segundos antes de pedir outro código."
-        : "Erro ao enviar o código. Tente novamente.";
-    } finally { btn.disabled = false; }
-  };
-
-  area.querySelector("#d-entrar").onclick = async () => {
-    const msg = area.querySelector("#d-msg-cod");
-    msg.textContent = "";
-    const codigo = area.querySelector("#d-codigo").value.trim();
-    if (!codigo) { msg.textContent = "Digite o código recebido."; return; }
+  async function entrar() {
+    msg.textContent = ""; info.textContent = "";
+    if (!email.value.trim() || !senha.value) {
+      msg.textContent = "Informe e-mail e senha."; return;
+    }
     const btn = area.querySelector("#d-entrar");
     btn.disabled = true;
     try {
-      const r = await window.rbcipAuth.verificarCodigo(cpf.value, codigo);
-      if (r.ok) { await init(); }
-      else { msg.textContent = "Código inválido ou expirado."; btn.disabled = false; }
+      const { error } = await supa.auth.signInWithPassword({
+        email: email.value.trim(),
+        password: senha.value,
+      });
+      if (error) {
+        msg.textContent = "E-mail ou senha inválidos.";
+        btn.disabled = false;
+        return;
+      }
+      await init();
     } catch (_) {
-      msg.textContent = "Erro ao validar o código.";
+      msg.textContent = "Erro ao entrar. Tente novamente.";
       btn.disabled = false;
     }
+  }
+
+  senha.addEventListener("keydown", (e) => { if (e.key === "Enter") entrar(); });
+  area.querySelector("#d-entrar").onclick = entrar;
+
+  area.querySelector("#d-esqueci").onclick = async () => {
+    msg.textContent = ""; info.textContent = "";
+    if (!email.value.trim()) { msg.textContent = "Digite seu e-mail para receber o link."; return; }
+    const redirect = new URL("redefinir.html", location.href).href;
+    const { error } = await supa.auth.resetPasswordForEmail(email.value.trim(), {
+      redirectTo: redirect,
+    });
+    if (error) { msg.textContent = "Não foi possível enviar o link."; return; }
+    info.textContent = "Se este e-mail tiver acesso, enviamos um link para definir a senha.";
   };
 }
 
