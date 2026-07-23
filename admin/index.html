@@ -26,19 +26,11 @@
       </div>
     </div>
 
+    <div class="tabs" id="tabs"></div>
+
     <section class="stats" id="stats"></section>
 
     <div class="filtros">
-      <div class="campo">
-        <label>Formulário</label>
-        <select id="f-formulario">
-          <option value="">Todos</option>
-          <option value="pagamentos">Pagamento</option>
-          <option value="reembolso">Reembolso</option>
-          <option value="diarias-colaboradores">Diárias — Colaboradores</option>
-          <option value="diarias-bolsistas">Diárias — Bolsistas</option>
-        </select>
-      </div>
       <div class="campo">
         <label>Status</label>
         <select id="f-status">
@@ -66,17 +58,7 @@
 
     <div class="tabela-wrap">
       <table class="subs">
-        <thead>
-          <tr>
-            <th>Data</th>
-            <th>Formulário</th>
-            <th>Nome</th>
-            <th>CPF</th>
-            <th>Projeto</th>
-            <th class="col-valor">Valor</th>
-            <th>Status</th>
-          </tr>
-        </thead>
+        <thead id="cabecalho"></thead>
         <tbody id="corpo-tabela"></tbody>
       </table>
       <div class="vazio" id="vazio" hidden>Nenhuma solicitação encontrada.</div>

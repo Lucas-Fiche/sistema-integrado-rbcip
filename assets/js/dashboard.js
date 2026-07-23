@@ -17,8 +17,47 @@ const FORM_LABEL = {
   "diarias-bolsistas": "Diárias — Bolsistas",
 };
 
+const ABAS = [
+  { id: "pagamentos", label: "Pagamento" },
+  { id: "reembolso", label: "Reembolso" },
+  { id: "diarias-colaboradores", label: "Diárias — Colaboradores" },
+  { id: "diarias-bolsistas", label: "Diárias — Bolsistas" },
+];
+
 let TODAS = [];
 let supa = null;
+let ABA = "pagamentos";
+
+/* Colunas específicas de cada formulário */
+const badgeStatus = (s) => `<span class="badge ${s}">${STATUS_LABEL[s] || s}</span>`;
+function campoDados(sub, chave) {
+  const v = sub.dados ? sub.dados[chave] : undefined;
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
+  return v == null || v === "" ? "—" : v;
+}
+
+const COL_INI = [
+  { h: "Data", g: (s) => fmtDataCurta(s.criado_em) },
+  { h: "Nome", g: (s) => s.nome || "—" },
+  { h: "CPF", g: (s) => s.cpf || "—" },
+];
+const COL_VALOR = { h: "Valor", g: (s) => fmtValor(s.valor), cls: "col-valor" };
+const COL_STATUS = { h: "Status", g: (s) => badgeStatus(s.status), html: true };
+const COL_DIARIAS = [
+  ...COL_INI,
+  { h: "Projeto", g: (s) => s.projeto || "—" },
+  { h: "Origem → Destino", g: (s) => campoDados(s, "Origem (Estado e Município)") + " → " + campoDados(s, "Destino (Estado e Município)") },
+  { h: "Período", g: (s) => campoDados(s, "Período Inicial") + " → " + campoDados(s, "Período Final") },
+  COL_VALOR,
+  COL_STATUS,
+];
+
+const COLUNAS = {
+  pagamentos: [...COL_INI, { h: "Chave PIX", g: (s) => campoDados(s, "Chave Pix (CPF)") }, COL_VALOR, COL_STATUS],
+  reembolso: [...COL_INI, { h: "Categoria", g: (s) => campoDados(s, "Categoria da Despesa") }, COL_VALOR, COL_STATUS],
+  "diarias-colaboradores": COL_DIARIAS,
+  "diarias-bolsistas": COL_DIARIAS,
+};
 
 /* ---------- Formatação ---------- */
 const fmtData = (iso) =>
@@ -154,25 +193,37 @@ async function carregar() {
     .order("criado_em", { ascending: false });
   if (error) { console.error("carregar submissoes:", error); TODAS = []; }
   else { TODAS = data || []; }
+  renderTabs();
   aplicarFiltros();
+}
+
+/* ---------- Abas por formulário ---------- */
+function renderTabs() {
+  const cont = document.getElementById("tabs");
+  cont.innerHTML = ABAS.map((a) => {
+    const n = TODAS.filter((s) => s.formulario === a.id).length;
+    return `<button type="button" class="tab ${a.id === ABA ? "ativa" : ""}" data-aba="${a.id}">${a.label}<span class="cont">${n}</span></button>`;
+  }).join("");
+  cont.querySelectorAll(".tab").forEach((b) => {
+    b.onclick = () => { ABA = b.dataset.aba; renderTabs(); aplicarFiltros(); };
+  });
 }
 
 /* ---------- Filtros ---------- */
 function configurarFiltros() {
-  ["f-formulario", "f-status", "f-de", "f-ate"].forEach((id) =>
+  ["f-status", "f-de", "f-ate"].forEach((id) =>
     document.getElementById(id).addEventListener("change", aplicarFiltros));
   document.getElementById("f-busca").addEventListener("input", aplicarFiltros);
 }
 
 function aplicarFiltros() {
-  const f = document.getElementById("f-formulario").value;
   const s = document.getElementById("f-status").value;
   const de = document.getElementById("f-de").value;
   const ate = document.getElementById("f-ate").value;
   const q = document.getElementById("f-busca").value.trim().toLowerCase();
 
   const lista = TODAS.filter((sub) => {
-    if (f && sub.formulario !== f) return false;
+    if (sub.formulario !== ABA) return false;
     if (s && sub.status !== s) return false;
     if (de && sub.criado_em < de) return false;
     if (ate && sub.criado_em > ate + "T23:59:59") return false;
@@ -184,6 +235,7 @@ function aplicarFiltros() {
   });
 
   renderStats(lista);
+  renderCabecalho();
   renderTabela(lista);
 }
 
@@ -205,24 +257,29 @@ function renderStats(lista) {
   document.getElementById("stats").innerHTML = cards.join("");
 }
 
-/* ---------- Tabela ---------- */
+/* ---------- Cabeçalho e tabela (colunas por formulário) ---------- */
+function renderCabecalho() {
+  const cols = COLUNAS[ABA] || [];
+  document.getElementById("cabecalho").innerHTML =
+    "<tr>" + cols.map((c) => `<th class="${c.cls || ""}">${esc(c.h)}</th>`).join("") + "</tr>";
+}
+
 function renderTabela(lista) {
   const corpo = document.getElementById("corpo-tabela");
   const vazio = document.getElementById("vazio");
+  const cols = COLUNAS[ABA] || [];
   corpo.innerHTML = "";
   vazio.hidden = lista.length > 0;
 
   lista.forEach((sub) => {
     const tr = document.createElement("tr");
     tr.className = "clicavel";
-    tr.innerHTML = `
-      <td>${fmtDataCurta(sub.criado_em)}</td>
-      <td>${esc(FORM_LABEL[sub.formulario] || sub.formulario)}</td>
-      <td>${esc(sub.nome || "—")}</td>
-      <td>${esc(sub.cpf || "—")}</td>
-      <td>${esc(sub.projeto || "—")}</td>
-      <td class="col-valor">${fmtValor(sub.valor)}</td>
-      <td><span class="badge ${sub.status}">${STATUS_LABEL[sub.status] || sub.status}</span></td>`;
+    tr.innerHTML = cols
+      .map((c) => {
+        const val = c.g(sub);
+        return `<td class="${c.cls || ""}">${c.html ? val : esc(val)}</td>`;
+      })
+      .join("");
     tr.onclick = () => abrirDetalhe(sub);
     corpo.appendChild(tr);
   });
