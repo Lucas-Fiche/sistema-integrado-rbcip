@@ -168,8 +168,8 @@ Deno.serve(async (req) => {
     gtoken = await tokenGoogle();
     const folderId = Deno.env.get("DRIVE_FOLDER_ID");
 
-    // 1. Copia o modelo
-    const copyResp = await fetch(`https://www.googleapis.com/drive/v3/files/${templateId}/copy`, {
+    // 1. Copia o modelo (supportsAllDrives: necessário para Drives Compartilhados)
+    const copyResp = await fetch(`https://www.googleapis.com/drive/v3/files/${templateId}/copy?supportsAllDrives=true`, {
       method: "POST",
       headers: { Authorization: `Bearer ${gtoken}`, "Content-Type": "application/json" },
       body: JSON.stringify({ name: `recibo-${record.formulario}-${record.recibo_numero}-${record.recibo_ano}`, parents: folderId ? [folderId] : undefined }),
@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
     await client.close();
 
     // 6. Limpa a cópia e marca como enviado
-    await fetch(`https://www.googleapis.com/drive/v3/files/${docId}`, { method: "DELETE", headers: { Authorization: `Bearer ${gtoken}` } });
+    await fetch(`https://www.googleapis.com/drive/v3/files/${docId}?supportsAllDrives=true`, { method: "DELETE", headers: { Authorization: `Bearer ${gtoken}` } });
     docId = null;
     await db.from("submissoes").update({ recibo_enviado_em: new Date().toISOString() }).eq("id", record.id);
 
@@ -233,7 +233,7 @@ Deno.serve(async (req) => {
     console.error(err);
     // best-effort: remove a cópia se algo falhou depois de criá-la
     if (docId && gtoken) {
-      try { await fetch(`https://www.googleapis.com/drive/v3/files/${docId}`, { method: "DELETE", headers: { Authorization: `Bearer ${gtoken}` } }); } catch (_) { /* ignora */ }
+      try { await fetch(`https://www.googleapis.com/drive/v3/files/${docId}?supportsAllDrives=true`, { method: "DELETE", headers: { Authorization: `Bearer ${gtoken}` } }); } catch (_) { /* ignora */ }
     }
     const e = err as { message?: string };
     return json({ ok: false, erro: e?.message || String(err) }, 500);
