@@ -58,14 +58,15 @@ window.rbcipAuth = {
   async meusDados() {
     const supa = await window.rbcipReady;
     if (!supa) return null;
+    // limit(1) em vez de maybeSingle: tolera eventuais registros duplicados
+    // (ex.: mesmo e-mail em mais de uma linha) sem quebrar.
     const { data, error } = await supa
       .from("pessoas")
       .select("nome,email,cpf,telefone,rg,orgao_uf,chave_pix,is_staff")
-      .maybeSingle();
+      .order("is_staff", { ascending: false })
+      .limit(1);
     if (error) console.error("meusDados erro:", error);
-    const { data: u } = await supa.auth.getUser();
-    console.log("meusDados -> uid:", u?.user?.id, "| registro:", data);
-    return data;
+    return (data && data[0]) || null;
   },
 
   async sair() {
