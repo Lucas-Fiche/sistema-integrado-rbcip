@@ -25,6 +25,7 @@ const ABAS = [
 ];
 
 let TODAS = [];
+let LISTA = [];
 let supa = null;
 let ABA = "pagamentos";
 
@@ -214,6 +215,7 @@ function configurarFiltros() {
   ["f-status", "f-de", "f-ate"].forEach((id) =>
     document.getElementById(id).addEventListener("change", aplicarFiltros));
   document.getElementById("f-busca").addEventListener("input", aplicarFiltros);
+  document.getElementById("btn-export").addEventListener("click", exportarCSV);
 }
 
 function aplicarFiltros() {
@@ -234,9 +236,81 @@ function aplicarFiltros() {
     return true;
   });
 
+  LISTA = lista;
   renderStats(lista);
+  renderGraficos(lista);
   renderCabecalho();
   renderTabela(lista);
+}
+
+/* ---------- Gráficos ---------- */
+function graficoPorMes(lista) {
+  const m = new Map();
+  lista.forEach((s) => {
+    const d = new Date(s.criado_em);
+    const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    m.set(key, (m.get(key) || 0) + (Number(s.valor) || 0));
+  });
+  return [...m.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([k, v]) => {
+      const [y, mm] = k.split("-");
+      const lbl = new Date(y, mm - 1, 1).toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
+      return [lbl, v];
+    });
+}
+
+function graficoPorChave(lista, chave) {
+  const m = new Map();
+  lista.forEach((s) => {
+    const k = s[chave] || "—";
+    m.set(k, (m.get(k) || 0) + (Number(s.valor) || 0));
+  });
+  return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+}
+
+function barras(titulo, dados) {
+  if (!dados.length) {
+    return `<div class="grafico"><h3>${esc(titulo)}</h3><p class="vazio-min">Sem dados para exibir.</p></div>`;
+  }
+  const max = Math.max(...dados.map((d) => d[1])) || 1;
+  const linhas = dados
+    .map(([k, v]) =>
+      `<div class="barra-row"><span class="barra-lbl" title="${esc(k)}">${esc(k)}</span>` +
+      `<span class="barra-track"><span class="barra-fill" style="width:${((v / max) * 100).toFixed(1)}%"></span></span>` +
+      `<span class="barra-val">${fmtValor(v)}</span></div>`)
+    .join("");
+  return `<div class="grafico"><h3>${esc(titulo)}</h3>${linhas}</div>`;
+}
+
+function renderGraficos(lista) {
+  const el = document.getElementById("graficos");
+  el.innerHTML =
+    barras("Valor por mês", graficoPorMes(lista)) +
+    barras("Valor por projeto", graficoPorChave(lista, "projeto"));
+}
+
+/* ---------- Exportar CSV ---------- */
+function exportarCSV() {
+  const cols = COLUNAS[ABA] || [];
+  const cab = cols.map((c) => c.h);
+  const linhas = LISTA.map((sub) =>
+    cols.map((c) => {
+      if (c.h === "Status") return STATUS_LABEL[sub.status] || sub.status;
+      return String(c.g(sub)).replace(/<[^>]+>/g, "");
+    }));
+  const escCSV = (v) => {
+    v = String(v == null ? "" : v);
+    return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  };
+  const csv = [cab, ...linhas].map((r) => r.map(escCSV).join(";")).join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = ABA + "-" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /* ---------- Resumo ---------- */
