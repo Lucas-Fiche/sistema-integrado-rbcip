@@ -79,7 +79,11 @@ as $$
 begin
   perform net.http_post(
     url     := 'https://doqojrrqemvlnpgjrkqu.supabase.co/functions/v1/gerar-recibo',
-    headers := jsonb_build_object('Content-Type', 'application/json'),
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      -- chave publishable/anon (pública) — necessária para o gateway rotear
+      'Authorization', 'Bearer sb_publishable_CZ5v2kL9BUn9pVs2V08y5Q_7OlDIQsE'
+    ),
     body    := jsonb_build_object(
       'token',  (select valor from app_config where chave = 'recibo_token'),
       'record', to_jsonb(new)
