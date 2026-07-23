@@ -222,7 +222,7 @@ function ativarFormulario(config) {
     }
   }
 
-  function mostrarErro(msg) {
+  function mostrarErro(msg, detalhe) {
     let box = document.getElementById("erro-envio");
     if (!box) {
       box = document.createElement("div");
@@ -231,7 +231,9 @@ function ativarFormulario(config) {
       form.parentNode.insertBefore(box, form);
     }
     box.innerHTML =
-      '<span class="i">⚠️</span><span>' + msg + "</span>";
+      '<span class="i">⚠️</span><span>' + msg +
+      (detalhe ? '<br><small style="opacity:.85">Detalhe técnico: ' + detalhe + "</small>" : "") +
+      "</span>";
     box.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
@@ -277,9 +279,12 @@ function ativarFormulario(config) {
       mostrarSucesso(registro);
     } catch (err) {
       console.error(err);
+      const e = err || {};
+      const detalhe = [e.message, e.details, e.hint, e.code].filter(Boolean).join(" · ");
       mostrarErro(
         "Não foi possível enviar sua solicitação agora. Verifique sua conexão e tente novamente. " +
-        "Se o problema persistir, entre em contato com o suporte."
+        "Se o problema persistir, entre em contato com o suporte.",
+        detalhe
       );
       if (btn) { btn.disabled = false; btn.textContent = textoBtn; }
     }
