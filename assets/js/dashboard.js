@@ -38,7 +38,7 @@ function campoDados(sub, chave) {
 }
 
 const COL_INI = [
-  { h: "Data", g: (s) => fmtDataCurta(s.criado_em) },
+  { h: "Data/Hora", g: (s) => fmtData(s.criado_em) },
   { h: "Nome", g: (s) => s.nome || "—" },
   { h: "CPF", g: (s) => s.cpf || "—" },
 ];
