@@ -238,7 +238,6 @@ function aplicarFiltros() {
 
   LISTA = lista;
   renderStats(lista);
-  renderGraficos(lista);
   renderCabecalho();
   renderTabela(lista);
 }

@@ -19,7 +19,10 @@
   <!-- Dashboard (revelado após login de staff) -->
   <main class="admin-wrap" id="area-dashboard" hidden>
     <div class="admin-top">
-      <h1>Solicitações</h1>
+      <nav class="dash-nav">
+        <a href="index.html" class="ativo">🗂️ Gestão</a>
+        <a href="acompanhamento.html">📊 Acompanhamento</a>
+      </nav>
       <div class="admin-user">
         <span id="quem"></span>
         <button type="button" class="link-sair" id="btn-sair">Sair</button>
@@ -59,8 +62,6 @@
         <button type="button" class="btn btn-secondary" id="btn-export">⬇ Exportar CSV</button>
       </div>
     </div>
-
-    <section class="graficos" id="graficos"></section>
 
     <div class="tabela-wrap">
       <table class="subs">

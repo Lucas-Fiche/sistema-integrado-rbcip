@@ -15,6 +15,19 @@
   margin-bottom: 22px;
 }
 .admin-top h1 { margin: 0; font-size: 1.4rem; }
+
+/* Navegação entre dashboards */
+.dash-nav { display: flex; flex-wrap: wrap; gap: 6px; }
+.dash-nav a {
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--muted);
+  padding: 8px 14px;
+  border-radius: 8px;
+}
+.dash-nav a:hover { background: var(--brand-light); color: var(--brand); }
+.dash-nav a.ativo { background: var(--brand); color: #fff; }
 .admin-user { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; color: var(--muted); }
 
 /* Abas por formulário */
