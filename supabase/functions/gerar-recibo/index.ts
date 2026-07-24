@@ -219,11 +219,39 @@ Deno.serve(async (req) => {
     const client = new SMTPClient({
       connection: { hostname: "smtp.gmail.com", port: 465, tls: true, auth: { username: Deno.env.get("GMAIL_USER")!, password: Deno.env.get("GMAIL_APP_PASSWORD")! } },
     });
+    const nomeBenef = record.nome || "-";
+    const cpfBenef = record.cpf || "-";
+    const valorBenef = fmtRS(Number(record.valor || 0));
+    const rotuloForm = ({
+      pagamentos: "Pagamento",
+      reembolso: "Reembolso",
+      "diarias-colaboradores": "Diárias — Colaboradores",
+      "diarias-bolsistas": "Diárias — Bolsistas",
+    } as Record<string, string>)[record.formulario] || record.formulario;
+    const esc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const html = `<!doctype html><html><body style="margin:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1c2b3a">
+  <div style="max-width:560px;margin:0 auto;padding:24px 16px">
+    <div style="background:#17324d;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0">
+      <div style="font-size:17px;font-weight:bold">Recibo ${esc(String(record.recibo_numero))}/${esc(String(record.recibo_ano))}</div>
+      <div style="font-size:13px;color:#c19a3e;margin-top:2px">${esc(rotuloForm)}</div>
+    </div>
+    <div style="background:#fff;padding:22px;border:1px solid #e3e8ee;border-top:none;border-radius:0 0 10px 10px">
+      <p style="margin:0 0 16px">Segue em anexo o recibo em PDF referente à solicitação abaixo.</p>
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <tr><td style="padding:6px 0;color:#5a6b7b;width:130px">Beneficiário</td><td style="padding:6px 0;font-weight:bold">${esc(nomeBenef)}</td></tr>
+        <tr><td style="padding:6px 0;color:#5a6b7b">CPF</td><td style="padding:6px 0">${esc(cpfBenef)}</td></tr>
+        <tr><td style="padding:6px 0;color:#5a6b7b">Valor</td><td style="padding:6px 0;font-weight:bold">${esc(valorBenef)}</td></tr>
+      </table>
+      <p style="margin:20px 0 0;font-size:12px;color:#8a97a4">Mensagem automática do Sistema Integrado RBCIP.</p>
+    </div>
+  </div>
+</body></html>`;
     await client.send({
       from: Deno.env.get("GMAIL_USER")!,
       to: destinatarios,
-      subject: `Recibo ${record.recibo_numero}/${record.recibo_ano} — ${record.formulario} — ${record.nome || ""}`,
-      content: `Segue em anexo o recibo (${record.formulario}).\nBeneficiário: ${record.nome || "-"}\nCPF: ${record.cpf || "-"}\nValor: ${fmtRS(Number(record.valor || 0))}\n\nMensagem automática do Sistema Integrado RBCIP.`,
+      subject: `Recibo ${record.recibo_numero}/${record.recibo_ano} — ${rotuloForm} — ${record.nome || ""}`,
+      content: "auto",
+      html,
       attachments: anexos as any,
     });
     await client.close();

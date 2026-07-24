@@ -200,7 +200,7 @@ table.subs tr.clicavel:hover { background: var(--brand-light); }
 .modal {
   background: var(--surface);
   border-radius: var(--radius);
-  max-width: 640px;
+  max-width: 920px;
   width: 100%;
   box-shadow: var(--shadow);
   overflow: hidden;
