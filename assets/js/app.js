@@ -294,17 +294,84 @@ function ativarFormulario(config) {
       sucesso.scrollIntoView({ behavior: "smooth", block: "center" });
     }
     const baixar = document.getElementById("baixar");
-    if (baixar) {
-      baixar.onclick = () => {
-        const blob = new Blob([JSON.stringify(registro, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = config.id + "-" + Date.now() + ".json";
-        a.click();
-        URL.revokeObjectURL(url);
-      };
-    }
+    if (baixar) baixar.onclick = () => gerarComprovante(registro);
+  }
+
+  // ---- Comprovante legível (para o solicitante imprimir ou salvar em PDF) ----
+  function escHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function fmtDataHora(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString("pt-BR") + " às " +
+      d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  }
+  function protocolo(iso) {
+    const d = new Date(iso), p = (n) => String(n).padStart(2, "0");
+    return "RBCIP-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+      "-" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+  }
+  function gerarComprovante(registro) {
+    const dados = registro.dados || {};
+    const logo = new URL("../assets/img/logo.png", location.href).href;
+    const proto = protocolo(registro.enviadoEm);
+    const linhas = Object.keys(dados).map((k) => {
+      if (k === "website") return "";
+      let v = dados[k];
+      if (Array.isArray(v)) v = v.join(", ");
+      if (v == null || v === "") return "";
+      if (/comprovante|anexo|arquivo/i.test(k) && typeof v === "string" && v.indexOf("/") >= 0) {
+        v = "Arquivo enviado com sucesso";
+      }
+      return '<tr><td class="k">' + escHtml(k) + '</td><td class="v">' + escHtml(v) + "</td></tr>";
+    }).filter(Boolean).join("");
+
+    const html = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      "<title>Comprovante — " + escHtml(registro.formulario) + "</title><style>" +
+      "*{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#1c2b3a;" +
+      "font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}" +
+      ".folha{max-width:720px;margin:24px auto;background:#fff;border:1px solid #e3e8ee;border-radius:12px;overflow:hidden}" +
+      ".topo{background:#17324d;color:#fff;padding:22px 28px;display:flex;align-items:center;gap:16px}" +
+      ".topo img{height:52px}.topo .t{flex:1}.topo h1{margin:0;font-size:18px}" +
+      ".topo p{margin:3px 0 0;font-size:13px;color:#c19a3e}" +
+      ".corpo{padding:24px 28px}.selo{display:inline-block;background:#e8f5ec;color:#1c7a3f;" +
+      "font-weight:bold;font-size:13px;padding:6px 12px;border-radius:20px;margin-bottom:18px}" +
+      ".meta{display:flex;flex-wrap:wrap;gap:14px 32px;margin-bottom:20px;font-size:13px}" +
+      ".meta b{display:block;color:#5a6b7b;font-weight:normal;margin-bottom:2px}" +
+      ".meta span{font-weight:bold;font-size:14px}" +
+      "table{width:100%;border-collapse:collapse}" +
+      "td{padding:9px 0;border-bottom:1px solid #eef1f4;font-size:14px;vertical-align:top}" +
+      "td.k{color:#5a6b7b;width:42%;padding-right:14px}td.v{font-weight:bold}" +
+      ".rodape{padding:16px 28px;background:#fafbfc;border-top:1px solid #e3e8ee;font-size:12px;color:#8a97a4}" +
+      ".acoes{max-width:720px;margin:0 auto 40px;display:flex;gap:10px;justify-content:center}" +
+      ".acoes button{font:inherit;font-weight:bold;padding:11px 20px;border-radius:8px;border:none;cursor:pointer}" +
+      ".b1{background:#17324d;color:#fff}.b2{background:#fff;color:#17324d;border:1px solid #cdd6df}" +
+      "@media print{body{background:#fff}.folha{border:none;margin:0;max-width:none}.no-print{display:none}}" +
+      "</style></head><body>" +
+      '<div class="folha"><div class="topo">' +
+      '<img src="' + logo + '" alt="RBCIP" onerror="this.style.display=\'none\'">' +
+      '<div class="t"><h1>Comprovante de Solicitação</h1><p>' + escHtml(registro.formulario) + "</p></div></div>" +
+      '<div class="corpo"><span class="selo">✓ Solicitação registrada</span>' +
+      '<div class="meta"><div><b>Protocolo</b><span>' + escHtml(proto) + "</span></div>" +
+      "<div><b>Data de envio</b><span>" + escHtml(fmtDataHora(registro.enviadoEm)) + "</span></div></div>" +
+      "<table>" + linhas + "</table></div>" +
+      '<div class="rodape">Este comprovante confirma o registro da sua solicitação no Sistema Integrado RBCIP. ' +
+      "Guarde o número de protocolo para eventuais consultas.</div></div>" +
+      '<div class="acoes no-print"><button class="b1" onclick="window.print()">Imprimir / Salvar em PDF</button>' +
+      '<button class="b2" onclick="window.close()">Fechar</button></div>' +
+      "</body></html>";
+
+    const win = window.open("", "_blank");
+    if (win) { win.document.write(html); win.document.close(); return; }
+    // Bloqueador de pop-up: baixa o comprovante como arquivo abrível no navegador
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "comprovante-" + config.id + "-" + proto + ".html";
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   function mostrarErro(msg, detalhe) {

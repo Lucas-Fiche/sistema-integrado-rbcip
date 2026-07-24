@@ -246,10 +246,15 @@ Deno.serve(async (req) => {
     </div>
   </div>
 </body></html>`;
+    // Assunto em ASCII puro: acentos/traços longos em cabeçalho (RFC 2047) podem
+    // corromper o MIME em alguns clientes (era o caso das Diárias). O texto
+    // bonito com acentos fica no corpo HTML, que é codificado corretamente.
+    const semAcento = (s: string) =>
+      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x00-\x7f]/g, "-");
     await client.send({
       from: Deno.env.get("GMAIL_USER")!,
       to: destinatarios,
-      subject: `Recibo ${record.recibo_numero}/${record.recibo_ano} — ${rotuloForm} — ${record.nome || ""}`,
+      subject: semAcento(`Recibo ${record.recibo_numero}/${record.recibo_ano} - ${rotuloForm} - ${record.nome || ""}`),
       content: "auto",
       html,
       attachments: anexos as any,
