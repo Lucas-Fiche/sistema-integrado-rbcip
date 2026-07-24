@@ -5,14 +5,10 @@ direto, sem passo de compilação.
 
 ## 1. Preparar a branch
 
-Recomendado publicar a partir da `main`. Se o trabalho está na branch de
-desenvolvimento, faça o merge antes:
-
-```bash
-git checkout main
-git merge claude/google-forms-html-css-js-r43aay
-git push origin main
-```
+Não é preciso preparar nada: o repositório tem uma única branch (a branch de
+desenvolvimento, que é a **branch padrão** no GitHub) e ela já contém todo o
+sistema. A Vercel publica essa branch como produção — cada `git push` nela gera
+um novo deploy automático.
 
 ## 2. Importar na Vercel
 
