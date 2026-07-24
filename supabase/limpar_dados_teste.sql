@@ -20,8 +20,8 @@ truncate table recibo_contador;
 --    preservar os cadastros de não bolsistas.
 delete from pessoas where tipo = 'nao_bolsista';
 
--- 4. (Opcional) Limpa os arquivos de teste do Storage: comprovantes de
---    reembolso e PDFs de recibo. Isto remove os registros do banco; para
---    apagar os arquivos físicos também, use o painel Storage do Supabase
---    (Delete) nos buckets 'comprovantes' e 'recibos'.
-delete from storage.objects where bucket_id in ('comprovantes', 'recibos');
+-- 4. Arquivos de teste do Storage (comprovantes de reembolso e PDFs de
+--    recibo): NÃO dá para apagar por SQL — o Supabase bloqueia o DELETE
+--    direto em storage.objects (erro 42501, protect_delete). Faça pelo
+--    painel: Storage → bucket 'comprovantes' e bucket 'recibos' →
+--    selecionar os arquivos → Delete.

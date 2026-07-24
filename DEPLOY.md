@@ -48,8 +48,11 @@ recibo de cada formulário vira `SIGLA-1/ANO`), rode no **SQL Editor** o arquivo
 
 > ⚠️ Ele **apaga todas as submissões** e zera os contadores de recibo — não há
 > como desfazer. Rode apenas quando tiver certeza de que os registros são de
-> teste. Os arquivos físicos do Storage (buckets `comprovantes` e `recibos`)
-> podem ser removidos pelo painel **Storage → Delete**.
+> teste.
+>
+> Os arquivos do Storage (buckets `comprovantes` e `recibos`) **não** podem ser
+> apagados por SQL — o Supabase bloqueia o `DELETE` direto (erro 42501). Remova
+> pelo painel **Storage → selecione o bucket → marque os arquivos → Delete**.
 
 ## 4. Conferir
 
