@@ -72,10 +72,14 @@ window.rbcipReady = (async () => {
         valor: parseValor(dados),
         dados,
       };
-      // Sem .select(): o RLS não permite leitura pública das submissões.
-      const { error } = await supabase.from("submissoes").insert(registro);
+      // Via função SECURITY DEFINER: insere e DEVOLVE o número do recibo
+      // (o RLS não permite ler a tabela submissoes de volta num insert comum).
+      const { data, error } = await supabase.rpc("fn_registrar_submissao", { p_registro: registro });
       if (error) throw error;
-      return true;
+      const linha = Array.isArray(data) ? data[0] : data;
+      return linha
+        ? { id: linha.id, reciboNumero: linha.recibo_numero, reciboAno: linha.recibo_ano }
+        : null;
     },
   };
 

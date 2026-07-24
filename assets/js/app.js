@@ -314,7 +314,13 @@ function ativarFormulario(config) {
   function gerarComprovante(registro) {
     const dados = registro.dados || {};
     const logo = new URL("../assets/img/logo.png", location.href).href;
-    const proto = protocolo(registro.enviadoEm);
+    // Número oficial do recibo (gerado no banco) quando disponível; senão,
+    // uma referência baseada na data de envio (modo local / sem banco).
+    const temRecibo = registro.recibo && registro.recibo.numero != null;
+    const rotuloNum = temRecibo ? "Número do recibo" : "Protocolo";
+    const proto = temRecibo
+      ? registro.recibo.numero + "/" + registro.recibo.ano
+      : protocolo(registro.enviadoEm);
     const linhas = Object.keys(dados).map((k) => {
       if (k === "website") return "";
       let v = dados[k];
@@ -353,7 +359,7 @@ function ativarFormulario(config) {
       '<img src="' + logo + '" alt="RBCIP" onerror="this.style.display=\'none\'">' +
       '<div class="t"><h1>Comprovante de Solicitação</h1><p>' + escHtml(registro.formulario) + "</p></div></div>" +
       '<div class="corpo"><span class="selo">✓ Solicitação registrada</span>' +
-      '<div class="meta"><div><b>Protocolo</b><span>' + escHtml(proto) + "</span></div>" +
+      '<div class="meta"><div><b>' + rotuloNum + "</b><span>" + escHtml(proto) + "</span></div>" +
       "<div><b>Data de envio</b><span>" + escHtml(fmtDataHora(registro.enviadoEm)) + "</span></div></div>" +
       "<table>" + linhas + "</table></div>" +
       '<div class="rodape">Este comprovante confirma o registro da sua solicitação no Sistema Integrado RBCIP. ' +
@@ -369,7 +375,7 @@ function ativarFormulario(config) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "comprovante-" + config.id + "-" + proto + ".html";
+    a.download = "comprovante-" + config.id + "-" + proto.replace(/\//g, "-") + ".html";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -423,7 +429,8 @@ function ativarFormulario(config) {
             }
           }
         }
-        await window.rbcipDB.salvarSubmissao({ formulario: config.id, dados });
+        const res = await window.rbcipDB.salvarSubmissao({ formulario: config.id, dados });
+        if (res && res.reciboNumero != null) registro.recibo = { numero: res.reciboNumero, ano: res.reciboAno };
         salvarLocal(registro);
       } else {
         salvarLocal(registro);
