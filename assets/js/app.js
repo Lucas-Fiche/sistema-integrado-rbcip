@@ -151,6 +151,17 @@ function ativarFormulario(config) {
   const form = document.getElementById("form");
   if (!form) return;
 
+  // Honeypot anti-spam: campo escondido que só robôs preenchem, + tempo mínimo
+  const honeypot = document.createElement("input");
+  honeypot.type = "text";
+  honeypot.name = "website";
+  honeypot.tabIndex = -1;
+  honeypot.autocomplete = "off";
+  honeypot.setAttribute("aria-hidden", "true");
+  honeypot.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
+  form.appendChild(honeypot);
+  const carregadoEm = Date.now();
+
   // Máscaras
   form.querySelectorAll("[data-mask='digits']").forEach(maskDigits);
   form.querySelectorAll("[data-mask='alnum']").forEach(maskAlphaNum);
@@ -319,6 +330,14 @@ function ativarFormulario(config) {
 
     const dados = coletarDados(form);
     const registro = { formulario: config.titulo, formId: config.id, enviadoEm: new Date().toISOString(), dados };
+
+    // Anti-spam: honeypot preenchido -> finge sucesso sem enviar (não alerta o bot)
+    if (honeypot.value) { mostrarSucesso(registro); return; }
+    // Envio rápido demais -> provável robô; pede para tentar de novo
+    if (Date.now() - carregadoEm < 1500) {
+      mostrarErro("Por segurança, aguarde um instante e envie novamente.");
+      return;
+    }
 
     const btn = form.querySelector('button[type="submit"]');
     const textoBtn = btn ? btn.textContent : "";
