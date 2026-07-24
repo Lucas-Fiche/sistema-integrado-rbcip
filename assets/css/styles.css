@@ -69,6 +69,19 @@ a { color: var(--brand); }
   color: rgba(255, 255, 255, 0.82);
   font-size: 0.94rem;
 }
+.site-header .header-inner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.site-header .site-logo {
+  flex: none;
+  height: 46px;
+  width: auto;
+  display: block;
+}
+.site-header .header-text { min-width: 0; }
 
 /* ---------- Container ---------- */
 .container {
