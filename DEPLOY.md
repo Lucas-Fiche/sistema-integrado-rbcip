@@ -3,12 +3,19 @@
 O projeto é um **site estático** (HTML/CSS/JS, sem build). A Vercel publica
 direto, sem passo de compilação.
 
-## 1. Preparar a branch
+## 1. Modelo de branches
 
-Não é preciso preparar nada: o repositório tem uma única branch (a branch de
-desenvolvimento, que é a **branch padrão** no GitHub) e ela já contém todo o
-sistema. A Vercel publica essa branch como produção — cada `git push` nela gera
-um novo deploy automático.
+O repositório usa duas branches:
+
+- **`main`** — produção. É o que a Vercel publica no site oficial. Deve ficar
+  sempre estável.
+- **`claude/google-forms-html-css-js-r43aay`** — desenvolvimento. As alterações
+  são feitas aqui primeiro; a Vercel gera uma **URL de Preview** para testar sem
+  afetar a produção. Quando aprovado, promovemos para a `main`.
+
+No GitHub, defina a **`main` como branch padrão** em
+**Settings → General → Default branch**. Assim a Vercel a usa como produção
+automaticamente.
 
 ## 2. Importar na Vercel
 
@@ -19,6 +26,7 @@ um novo deploy automático.
    - **Root Directory:** a raiz do repositório (onde está `index.html`).
    - **Build Command:** deixe **vazio**.
    - **Output Directory:** deixe **vazio** (serve a raiz).
+   - **Production Branch:** `main` (Settings → Git, se precisar ajustar).
 4. Clique em **Deploy**. Em segundos o site estará no ar em uma URL
    `https://SEU-PROJETO.vercel.app` (depois dá para apontar um domínio próprio).
 
@@ -57,9 +65,18 @@ recibo de cada formulário vira `SIGLA-1/ANO`), rode no **SQL Editor** o arquivo
   - o **recibo** chega ao e-mail do financeiro.
 - Faça login no painel (`/admin/`) com e-mail + senha.
 
-## Atualizações futuras
+## Atualizações futuras (fluxo de trabalho)
 
-Cada `git push` na branch publicada dispara um novo deploy automático na Vercel.
+1. As mudanças entram na branch de desenvolvimento
+   (`claude/google-forms-html-css-js-r43aay`).
+2. A Vercel publica automaticamente uma **URL de Preview** dessa branch, para a
+   equipe testar sem tocar na produção.
+3. Aprovado, promovemos para produção: abra um **Pull Request** da branch de
+   desenvolvimento para a `main` no GitHub e clique em **Merge**. O merge na
+   `main` dispara o **deploy de produção** automático.
+4. Se algo der errado, use **Deployments → versão anterior → Promote to
+   Production** na Vercel para voltar em um clique (rollback).
+
 O `vercel.json` já define cache que revalida os arquivos, então os usuários
 pegam a versão nova sem precisar limpar o cache manualmente.
 
