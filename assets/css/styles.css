@@ -337,6 +337,39 @@ textarea { min-height: 96px; resize: vertical; }
 }
 .field.invalid .error { display: block; }
 
+/* Estado válido (feedback em tempo real) */
+.field.valido input,
+.field.valido textarea,
+.field.valido select { border-color: #86c5a6; }
+
+/* Aviso não bloqueante (ex.: chave PIX diferente do CPF) */
+.field .aviso {
+  margin-top: 6px;
+  padding: 7px 10px;
+  background: #fff8e6;
+  border: 1px solid #f2e2b3;
+  border-radius: 6px;
+  color: #7a5c00;
+  font-size: 0.83rem;
+}
+
+/* Prévia do comprovante */
+.file-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.file-preview img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
 /* ---------- Ações ---------- */
 .actions {
   display: flex;

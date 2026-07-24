@@ -40,7 +40,7 @@ function campoDados(sub, chave) {
 const COL_INI = [
   { h: "Data/Hora", g: (s) => fmtData(s.criado_em) },
   { h: "Nome", g: (s) => s.nome || "—" },
-  { h: "CPF", g: (s) => s.cpf || "—" },
+  { h: "CPF", g: (s) => fmtCpf(s.cpf) },
 ];
 const COL_VALOR = { h: "Valor", g: (s) => fmtValor(s.valor), cls: "col-valor" };
 const COL_STATUS = { h: "Status", g: (s) => badgeStatus(s.status), html: true };
@@ -72,6 +72,10 @@ const fmtValor = (n) =>
   n == null ? "—" : "R$ " + Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmtCpf = (c) => {
+  const v = String(c || "").replace(/\D/g, "");
+  return v.length === 11 ? `${v.slice(0,3)}.${v.slice(3,6)}.${v.slice(6,9)}-${v.slice(9)}` : (c || "—");
+};
 
 /* ---------- Inicialização / acesso ---------- */
 async function init() {

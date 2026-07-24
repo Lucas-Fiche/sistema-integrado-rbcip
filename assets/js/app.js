@@ -1,135 +1,119 @@
 /* =============================================================
-   Máscaras, validação e envio dos formulários
+   Máscaras, validação em tempo real e envio dos formulários
    ============================================================= */
 
+const UFS = new Set(["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"]);
+
 /* ---------- Máscaras de entrada ---------- */
-
-// Mantém apenas dígitos (CPF, "APENAS NÚMEROS")
 function maskDigits(el) {
-  el.addEventListener("input", () => {
-    el.value = el.value.replace(/\D/g, "");
-  });
+  el.addEventListener("input", () => { el.value = el.value.replace(/\D/g, ""); });
 }
-
-// Mantém apenas letras e números (RG do formulário de reembolso)
 function maskAlphaNum(el) {
-  el.addEventListener("input", () => {
-    el.value = el.value.replace(/[^A-Za-z0-9]/g, "");
-  });
+  el.addEventListener("input", () => { el.value = el.value.replace(/[^A-Za-z0-9]/g, ""); });
 }
-
-// Valor monetário no formato brasileiro (1.234,56)
 function maskMoney(el) {
   el.addEventListener("input", () => {
     let v = el.value.replace(/\D/g, "");
     if (!v) { el.value = ""; return; }
     v = (parseInt(v, 10) / 100).toFixed(2);
-    v = v.replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    el.value = v;
+    el.value = v.replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   });
+}
+// CPF formatado em tempo real: 000.000.000-00
+function formatarCpf(entrada) {
+  const v = (entrada || "").replace(/\D/g, "").slice(0, 11);
+  if (v.length > 9) return `${v.slice(0,3)}.${v.slice(3,6)}.${v.slice(6,9)}-${v.slice(9)}`;
+  if (v.length > 6) return `${v.slice(0,3)}.${v.slice(3,6)}.${v.slice(6)}`;
+  if (v.length > 3) return `${v.slice(0,3)}.${v.slice(3)}`;
+  return v;
+}
+function maskCpf(el) {
+  el.addEventListener("input", () => { el.value = formatarCpf(el.value); });
 }
 
 /* ---------- Validação ---------- */
-
 function setError(field, msg) {
   field.classList.add("invalid");
+  field.classList.remove("valido");
   const err = field.querySelector(".error");
   if (err && msg) err.textContent = msg;
 }
-
-function clearError(field) {
+function setValido(field) {
   field.classList.remove("invalid");
+  field.classList.add("valido");
 }
+function clearEstado(field) { field.classList.remove("invalid", "valido"); }
 
-// Valida um CPF (11 dígitos + dígitos verificadores)
 function cpfValido(cpf) {
   cpf = cpf.replace(/\D/g, "");
   if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
   let soma = 0;
   for (let i = 0; i < 9; i++) soma += parseInt(cpf[i], 10) * (10 - i);
-  let d1 = 11 - (soma % 11);
-  if (d1 >= 10) d1 = 0;
+  let d1 = 11 - (soma % 11); if (d1 >= 10) d1 = 0;
   if (d1 !== parseInt(cpf[9], 10)) return false;
   soma = 0;
   for (let i = 0; i < 10; i++) soma += parseInt(cpf[i], 10) * (11 - i);
-  let d2 = 11 - (soma % 11);
-  if (d2 >= 10) d2 = 0;
+  let d2 = 11 - (soma % 11); if (d2 >= 10) d2 = 0;
   return d2 === parseInt(cpf[10], 10);
 }
 
-// Valida o formulário inteiro; retorna true/false e marca os campos
-function validarFormulario(form) {
-  let valido = true;
-  let primeiroErro = null;
+// Valida UM campo; marca invalid/valido e retorna true/false.
+function validarCampo(field, form) {
+  const controls = field.querySelectorAll("input, textarea, select");
+  if (!controls.length) return true;
+  const first = controls[0];
+  const type = first.getAttribute("type");
+  const tipoCampo = field.dataset.validate;
 
-  // Limpa estados anteriores
-  form.querySelectorAll(".field").forEach(clearError);
-
-  form.querySelectorAll(".field").forEach((field) => {
-    const controls = field.querySelectorAll(
-      "input, textarea, select"
-    );
-    if (!controls.length) return;
-
-    const first = controls[0];
-    const type = first.getAttribute("type");
-    const tipoCampo = field.dataset.validate;
-
-    // Grupos de checkbox/radio obrigatórios
-    if (type === "checkbox" || type === "radio") {
-      const required = field.dataset.required === "true";
-      if (required) {
-        const algum = [...controls].some(
-          (c) => (c.type === "checkbox" || c.type === "radio") && c.checked
-        );
-        if (!algum) {
-          setError(field, "Selecione ao menos uma opção.");
-          valido = false;
-        }
-      }
-      return;
+  // Grupos de checkbox/radio obrigatórios
+  if (type === "checkbox" || type === "radio") {
+    if (field.dataset.required === "true") {
+      const algum = [...controls].some((c) => (c.type === "checkbox" || c.type === "radio") && c.checked);
+      if (!algum) { setError(field, "Selecione ao menos uma opção."); return false; }
     }
-
-    const value = (first.value || "").trim();
-
-    // Obrigatório vazio
-    if (first.required && !value) {
-      setError(field, "Este campo é obrigatório.");
-      valido = false;
-      if (!primeiroErro) primeiroErro = field;
-      return;
-    }
-
-    if (!value) return; // opcional e vazio
-
-    // Validações específicas
-    if (type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      setError(field, "Informe um e-mail válido.");
-      valido = false;
-    } else if (tipoCampo === "cpf" && !cpfValido(value)) {
-      setError(field, "CPF inválido. Verifique os números digitados.");
-      valido = false;
-    } else if (tipoCampo === "money" && !/^\d{1,3}(\.\d{3})*,\d{2}$/.test(value)) {
-      setError(field, "Informe um valor válido. Ex.: 1.234,56");
-      valido = false;
-    } else if (tipoCampo === "orgao-uf" && !/^[A-Za-zÀ-ÿ]{2,}\/[A-Za-z]{2}$/.test(value)) {
-      setError(field, "Use o formato SSP/DF.");
-      valido = false;
-    }
-
-    if (field.classList.contains("invalid") && !primeiroErro) {
-      primeiroErro = field;
-    }
-  });
-
-  if (primeiroErro) {
-    primeiroErro.scrollIntoView({ behavior: "smooth", block: "center" });
+    clearEstado(field);
+    return true;
   }
-  return valido;
+
+  const value = (first.value || "").trim();
+  if (first.required && !value) { setError(field, "Este campo é obrigatório."); return false; }
+  if (!value) { clearEstado(field); return true; } // opcional e vazio
+
+  if (type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    setError(field, "Informe um e-mail válido."); return false;
+  }
+  if (tipoCampo === "cpf" && !cpfValido(value)) {
+    setError(field, "CPF inválido. Verifique os números digitados."); return false;
+  }
+  if (tipoCampo === "money") {
+    if (!/^\d{1,3}(\.\d{3})*,\d{2}$/.test(value)) { setError(field, "Informe um valor válido. Ex.: 1.234,56"); return false; }
+    if (Number(value.replace(/\./g, "").replace(",", ".")) <= 0) { setError(field, "O valor deve ser maior que zero."); return false; }
+  }
+  if (tipoCampo === "orgao-uf") {
+    const m = value.match(/^([A-Za-zÀ-ÿ]{2,})\/([A-Za-z]{2})$/);
+    if (!m) { setError(field, "Use o formato SSP/DF."); return false; }
+    if (!UFS.has(m[2].toUpperCase())) { setError(field, "UF inválida (use a sigla do estado, ex.: DF, SP, MG)."); return false; }
+  }
+  if (first.name === "periodo_final") {
+    const ini = form.querySelector('[name="periodo_inicial"]');
+    if (ini && ini.value && value < ini.value) {
+      setError(field, "A data final não pode ser anterior à data inicial."); return false;
+    }
+  }
+  setValido(field);
+  return true;
 }
 
-/* ---------- Coleta e envio ---------- */
+function validarFormulario(form) {
+  let primeiroErro = null;
+  form.querySelectorAll(".field").forEach((field) => {
+    if (!validarCampo(field, form) && !primeiroErro) primeiroErro = field;
+  });
+  if (primeiroErro) primeiroErro.scrollIntoView({ behavior: "smooth", block: "center" });
+  return !primeiroErro;
+}
 
+/* ---------- Coleta ---------- */
 function coletarDados(form) {
   const dados = {};
   form.querySelectorAll(".field").forEach((field) => {
@@ -145,9 +129,7 @@ function coletarDados(form) {
         .map((c) => {
           if (c.dataset.other === "true") {
             const outro = field.querySelector(".other-input");
-            return outro && outro.value.trim()
-              ? "Outro: " + outro.value.trim()
-              : "Outro";
+            return outro && outro.value.trim() ? "Outro: " + outro.value.trim() : "Outro";
           }
           return c.value;
         });
@@ -169,26 +151,120 @@ function ativarFormulario(config) {
   const form = document.getElementById("form");
   if (!form) return;
 
-  // Aplica máscaras
+  // Máscaras
   form.querySelectorAll("[data-mask='digits']").forEach(maskDigits);
   form.querySelectorAll("[data-mask='alnum']").forEach(maskAlphaNum);
   form.querySelectorAll("[data-mask='money']").forEach(maskMoney);
+  form.querySelectorAll("[data-mask='cpf']").forEach(maskCpf);
 
   // Campos "Outro:" — habilita a caixa de texto ao marcar
   form.querySelectorAll("[data-other='true']").forEach((chk) => {
     const wrap = chk.closest(".field");
     const outro = wrap?.querySelector(".other-input");
     if (outro) {
-      const sync = () => {
-        outro.disabled = !chk.checked;
-        if (!chk.checked) outro.value = "";
-      };
+      const sync = () => { outro.disabled = !chk.checked; if (!chk.checked) outro.value = ""; };
       chk.addEventListener("change", sync);
       sync();
     }
   });
 
-  // Salva no navegador (fallback / histórico local)
+  // Validação em tempo real: valida ao sair do campo; limpa erro ao corrigir
+  form.querySelectorAll(".field").forEach((field) => {
+    field.querySelectorAll("input, textarea, select").forEach((ctrl) => {
+      ctrl.addEventListener("blur", () => validarCampo(field, form));
+      const revalida = () => { if (field.classList.contains("invalid")) validarCampo(field, form); };
+      ctrl.addEventListener("input", revalida);
+      ctrl.addEventListener("change", revalida);
+    });
+  });
+  // Data final revalida quando a inicial muda
+  const iniInput = form.querySelector('[name="periodo_inicial"]');
+  const fimInput = form.querySelector('[name="periodo_final"]');
+  if (iniInput && fimInput) {
+    iniInput.addEventListener("change", () => {
+      if (fimInput.value) validarCampo(fimInput.closest(".field"), form);
+    });
+  }
+
+  // Chave Pix = CPF automático (+ aviso se ficarem diferentes)
+  const cpfInput = form.querySelector('[name="cpf"]');
+  const pixInput = form.querySelector('[name="chave_pix"]');
+  if (cpfInput && pixInput) {
+    let pixManual = false, sincronizando = false;
+    const atualizarAviso = () => {
+      const field = pixInput.closest(".field");
+      const cpfDig = cpfInput.value.replace(/\D/g, "");
+      const pixDig = pixInput.value.replace(/\D/g, "");
+      let aviso = field.querySelector(".aviso");
+      if (cpfDig && pixDig && cpfDig !== pixDig) {
+        if (!aviso) { aviso = document.createElement("p"); aviso.className = "aviso"; field.appendChild(aviso); }
+        aviso.textContent = "Atenção: a chave PIX está diferente do CPF. Confirme se há justificativa aprovada.";
+      } else if (aviso) { aviso.remove(); }
+    };
+    pixInput.addEventListener("input", () => { if (!sincronizando) pixManual = true; atualizarAviso(); });
+    cpfInput.addEventListener("input", () => {
+      if (!pixManual) { sincronizando = true; pixInput.value = cpfInput.value; sincronizando = false; }
+      atualizarAviso();
+    });
+  }
+
+  // Prévia + validação do comprovante (imagem)
+  form.querySelectorAll('input[type="file"]').forEach((inp) => {
+    const field = inp.closest(".field");
+    inp.addEventListener("change", () => {
+      const antiga = field.querySelector(".file-preview");
+      if (antiga) antiga.remove();
+      clearEstado(field);
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      if (!f.type.startsWith("image/")) { setError(field, "O comprovante deve ser uma imagem (JPG ou PNG)."); inp.value = ""; return; }
+      if (f.size > 8 * 1024 * 1024) { setError(field, "Imagem muito grande (máx. 8 MB). Reduza e tente novamente."); inp.value = ""; return; }
+      const prev = document.createElement("div");
+      prev.className = "file-preview";
+      const url = URL.createObjectURL(f);
+      const img = document.createElement("img");
+      img.src = url; img.alt = "Prévia do comprovante";
+      const span = document.createElement("span");
+      span.textContent = `${f.name} · ${(f.size / 1048576).toFixed(2)} MB`;
+      prev.append(img, span);
+      field.appendChild(prev);
+      setValido(field);
+    });
+  });
+
+  /* ----- Rascunho automático (não perde o preenchimento) ----- */
+  const draftKey = "rbcip_draft_" + config.id;
+  function restaurarDraft() {
+    let d;
+    try { d = JSON.parse(localStorage.getItem(draftKey) || "null"); } catch (_) { d = null; }
+    if (!d) return;
+    Object.entries(d).forEach(([name, val]) => {
+      form.querySelectorAll(`[name="${CSS.escape(name)}"]`).forEach((el) => {
+        if (el.type === "checkbox" || el.type === "radio") {
+          if (Array.isArray(val) && val.includes(el.value || "on")) { el.checked = true; el.dispatchEvent(new Event("change", { bubbles: true })); }
+        } else { el.value = val; el.dispatchEvent(new Event("input", { bubbles: true })); }
+      });
+    });
+  }
+  let draftTimer;
+  function salvarDraft() {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      const d = {};
+      form.querySelectorAll("input, textarea, select").forEach((c) => {
+        if (c.type === "file" || !c.name) return;
+        if (c.type === "checkbox" || c.type === "radio") {
+          if (c.checked) (d[c.name] = d[c.name] || []).push(c.value || "on");
+        } else if (c.value) d[c.name] = c.value;
+      });
+      try { localStorage.setItem(draftKey, JSON.stringify(d)); } catch (_) { /* indisponível */ }
+    }, 400);
+  }
+  form.addEventListener("input", salvarDraft);
+  form.addEventListener("change", salvarDraft);
+  restaurarDraft();
+
+  /* ----- Persistência / envio ----- */
   function salvarLocal(registro) {
     try {
       const chave = "rbcip_" + config.id;
@@ -199,19 +275,17 @@ function ativarFormulario(config) {
   }
 
   function mostrarSucesso(registro) {
+    try { localStorage.removeItem(draftKey); } catch (_) { /* ok */ }
     const sucesso = document.getElementById("sucesso");
     if (sucesso) {
       form.style.display = "none";
       sucesso.classList.add("show");
       sucesso.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-    // Botão de download do comprovante em JSON
     const baixar = document.getElementById("baixar");
     if (baixar) {
       baixar.onclick = () => {
-        const blob = new Blob([JSON.stringify(registro, null, 2)], {
-          type: "application/json",
-        });
+        const blob = new Blob([JSON.stringify(registro, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -244,21 +318,15 @@ function ativarFormulario(config) {
     if (!validarFormulario(form)) return;
 
     const dados = coletarDados(form);
-    const registro = {
-      formulario: config.titulo,
-      formId: config.id,
-      enviadoEm: new Date().toISOString(),
-      dados,
-    };
+    const registro = { formulario: config.titulo, formId: config.id, enviadoEm: new Date().toISOString(), dados };
 
     const btn = form.querySelector('button[type="submit"]');
     const textoBtn = btn ? btn.textContent : "";
     if (btn) { btn.disabled = true; btn.textContent = "Enviando…"; }
 
     try {
-      if (window.rbcipReady) await window.rbcipReady; // aguarda o cliente
+      if (window.rbcipReady) await window.rbcipReady;
       if (window.rbcipDB && window.rbcipDB.configurado) {
-        // Sobe anexos (ex.: comprovante do Reembolso) ao Storage
         if (window.rbcipDB.uploadArquivo) {
           for (const inp of form.querySelectorAll('input[type="file"]')) {
             if (inp.files && inp.files[0]) {
@@ -269,11 +337,9 @@ function ativarFormulario(config) {
             }
           }
         }
-        // Envia ao Supabase; guarda cópia local como comprovante
         await window.rbcipDB.salvarSubmissao({ formulario: config.id, dados });
         salvarLocal(registro);
       } else {
-        // Modo local (Supabase ainda não configurado)
         salvarLocal(registro);
       }
       mostrarSucesso(registro);
@@ -290,7 +356,6 @@ function ativarFormulario(config) {
     }
   });
 
-  // Formulários protegidos: exige login e faz o autofill da Seção 1
   if (config.requerLogin && typeof rbcipProteger === "function") {
     rbcipProteger(form, config);
   }

@@ -52,7 +52,7 @@ function campoCPF() {
     <div class="field" data-label="CPF" data-validate="cpf">
       <label>CPF ${REQ}</label>
       <span class="hint">Por favor, APENAS NÚMEROS.</span>
-      <input type="text" name="cpf" inputmode="numeric" maxlength="11" data-mask="digits" required />
+      <input type="text" name="cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" data-mask="cpf" required />
       <span class="error"></span>
     </div>`;
 }
@@ -81,8 +81,8 @@ function campoChavePix() {
   return `
     <div class="field" data-label="Chave Pix (CPF)">
       <label>Chave Pix (CPF) ${REQ}</label>
-      <span class="hint">Por favor, APENAS NÚMEROS.</span>
-      <input type="text" name="chave_pix" inputmode="numeric" maxlength="11" data-mask="digits" required />
+      <span class="hint">Chave do tipo CPF (preenche automaticamente com o CPF acima).</span>
+      <input type="text" name="chave_pix" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" data-mask="cpf" required />
       <span class="error"></span>
     </div>`;
 }
