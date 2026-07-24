@@ -194,10 +194,15 @@ Deno.serve(async (req) => {
       headers: { Authorization: `Bearer ${gtoken}` },
     });
     if (!exp.ok) throw new Error("Drive export: " + await exp.text());
-    const pdfB64 = toBase64(new Uint8Array(await exp.arrayBuffer()));
+    const pdfBytes = new Uint8Array(await exp.arrayBuffer());
+    const pdfB64 = toBase64(pdfBytes);
 
     // 4. Monta anexos (PDF + comprovante do reembolso)
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // Guarda o PDF no Storage para o dashboard poder exibir
+    const reciboPath = `${record.id}-${record.recibo_ano}-${record.recibo_numero}.pdf`;
+    await db.storage.from("recibos").upload(reciboPath, pdfBytes, { contentType: "application/pdf", upsert: true });
     const nomeArq = `recibo-${record.formulario}-${record.recibo_numero}-${record.recibo_ano}.pdf`;
     const anexos: Record<string, unknown>[] = [{ filename: nomeArq, content: pdfB64, encoding: "base64", contentType: "application/pdf" }];
     if (record.formulario === "reembolso") {
@@ -226,7 +231,7 @@ Deno.serve(async (req) => {
     // 6. Limpa a cópia e marca como enviado
     await fetch(`https://www.googleapis.com/drive/v3/files/${docId}?supportsAllDrives=true`, { method: "DELETE", headers: { Authorization: `Bearer ${gtoken}` } });
     docId = null;
-    await db.from("submissoes").update({ recibo_enviado_em: new Date().toISOString() }).eq("id", record.id);
+    await db.from("submissoes").update({ recibo_enviado_em: new Date().toISOString(), recibo_path: reciboPath }).eq("id", record.id);
 
     return json({ ok: true, numero: `${record.recibo_numero}/${record.recibo_ano}`, destinatarios });
   } catch (err) {

@@ -109,3 +109,17 @@ create policy "auth envia comprovantes"
   on storage.objects for insert
   to authenticated
   with check (bucket_id = 'comprovantes');
+
+-- 7. Storage: PDFs de recibo (para visualização no Dashboard de Gestão)
+alter table submissoes add column if not exists recibo_path text;
+
+insert into storage.buckets (id, name, public)
+values ('recibos', 'recibos', false)
+on conflict (id) do nothing;
+
+-- Somente staff pode ler os recibos (depende de fn_is_staff, do schema_dashboard)
+drop policy if exists "staff le recibos" on storage.objects;
+create policy "staff le recibos"
+  on storage.objects for select
+  to authenticated
+  using (bucket_id = 'recibos' and fn_is_staff());

@@ -385,9 +385,14 @@ function abrirDetalhe(sub) {
     linhas.push([k, v]);
   });
 
-  body.innerHTML = linhas
+  const recibo = sub.recibo_path
+    ? `<button type="button" class="btn btn-secondary" id="ver-recibo" style="margin-bottom:16px">📄 Ver recibo (PDF)</button>`
+    : `<p class="vazio-min" style="margin-bottom:16px">Recibo ainda não disponível para esta solicitação.</p>`;
+  body.innerHTML = recibo + linhas
     .map(([k, v]) => `<div class="det-linha"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`)
     .join("");
+  const btnRecibo = document.getElementById("ver-recibo");
+  if (btnRecibo) btnRecibo.onclick = () => verRecibo(sub.recibo_path, btnRecibo);
 
   // Botões de status
   const acoes = document.getElementById("acoes-status");
@@ -399,6 +404,16 @@ function abrirDetalhe(sub) {
   });
 
   document.getElementById("modal-bg").classList.add("aberto");
+}
+
+// Abre o PDF do recibo (URL assinada temporária; acesso só de staff via RLS)
+async function verRecibo(path, btn) {
+  const txt = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "Abrindo…"; }
+  const { data, error } = await supa.storage.from("recibos").createSignedUrl(path, 120);
+  if (btn) { btn.disabled = false; btn.textContent = txt; }
+  if (error || !data) { console.error("verRecibo:", error); alert("Não foi possível abrir o recibo."); return; }
+  window.open(data.signedUrl, "_blank");
 }
 
 async function mudarStatus(sub, novo) {
