@@ -37,7 +37,9 @@ function campoDados(sub, chave) {
   return v == null || v === "" ? "—" : v;
 }
 
+const fmtRecibo = (s) => (s.recibo_numero != null ? s.recibo_numero + "/" + s.recibo_ano : "—");
 const COL_INI = [
+  { h: "Recibo", g: fmtRecibo, cls: "col-recibo" },
   { h: "Data/Hora", g: (s) => fmtData(s.criado_em) },
   { h: "Nome", g: (s) => s.nome || "—" },
   { h: "CPF", g: (s) => fmtCpf(s.cpf) },
@@ -372,9 +374,12 @@ function configurarModal() {
 function abrirDetalhe(sub) {
   const body = document.getElementById("modal-body");
   document.getElementById("modal-titulo").textContent =
-    (FORM_LABEL[sub.formulario] || sub.formulario) + " · " + fmtDataCurta(sub.criado_em);
+    (FORM_LABEL[sub.formulario] || sub.formulario) +
+    (sub.recibo_numero != null ? " · Recibo " + fmtRecibo(sub) : "") +
+    " · " + fmtDataCurta(sub.criado_em);
 
   const linhas = [
+    ["Nº do recibo", fmtRecibo(sub)],
     ["Enviado em", fmtData(sub.criado_em)],
     ["Status atual", STATUS_LABEL[sub.status] || sub.status],
   ];
