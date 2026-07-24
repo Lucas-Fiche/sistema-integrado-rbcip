@@ -316,10 +316,12 @@ function ativarFormulario(config) {
     const logo = new URL("../assets/img/logo.png", location.href).href;
     // Número oficial do recibo (gerado no banco) quando disponível; senão,
     // uma referência baseada na data de envio (modo local / sem banco).
+    // Sigla por formulário torna o número único entre formulários (PAG-12/2026).
+    const SIGLAS = { pagamentos: "PAG", reembolso: "REE", "diarias-colaboradores": "DC", "diarias-bolsistas": "DB" };
     const temRecibo = registro.recibo && registro.recibo.numero != null;
     const rotuloNum = temRecibo ? "Número do recibo" : "Protocolo";
     const proto = temRecibo
-      ? registro.recibo.numero + "/" + registro.recibo.ano
+      ? (SIGLAS[config.id] || "REC") + "-" + registro.recibo.numero + "/" + registro.recibo.ano
       : protocolo(registro.enviadoEm);
     const linhas = Object.keys(dados).map((k) => {
       if (k === "website") return "";

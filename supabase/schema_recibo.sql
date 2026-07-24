@@ -9,15 +9,20 @@ alter table submissoes
   add column if not exists recibo_ano        int,
   add column if not exists recibo_enviado_em timestamptz;
 
--- 2. Contador sequencial por ano (numeração dos recibos)
+-- 2. Contador sequencial por FORMULÁRIO e ano.
+--    Cada formulário tem a própria contagem (1, 2, 3...). A sigla do
+--    formulário (PAG/REE/DC/DB) é adicionada na exibição para tornar o
+--    identificador único entre formulários (ex.: PAG-12/2026, REE-3/2026).
 create table if not exists recibo_contador (
-  ano    int primary key,
-  ultimo int not null default 0
+  formulario text not null,
+  ano        int  not null,
+  ultimo     int  not null default 0,
+  primary key (formulario, ano)
 );
 
 -- SECURITY DEFINER: escreve no contador mesmo com RLS ativo e sem grants
 -- para os papéis públicos (o INSERT do formulário chama isto via trigger).
-create or replace function fn_proximo_recibo(p_ano int)
+create or replace function fn_proximo_recibo(p_formulario text, p_ano int)
 returns int
 language plpgsql
 security definer
@@ -25,8 +30,10 @@ set search_path = public
 as $$
 declare n int;
 begin
-  insert into recibo_contador (ano, ultimo) values (p_ano, 1)
-  on conflict (ano) do update set ultimo = recibo_contador.ultimo + 1
+  insert into recibo_contador (formulario, ano, ultimo)
+  values (p_formulario, p_ano, 1)
+  on conflict (formulario, ano)
+    do update set ultimo = recibo_contador.ultimo + 1
   returning ultimo into n;
   return n;
 end;
@@ -37,14 +44,14 @@ $$;
 -- operando normalmente.
 alter table recibo_contador enable row level security;
 
--- 3. Numera o recibo no momento do INSERT
+-- 3. Numera o recibo no momento do INSERT (contagem por formulário)
 create or replace function fn_numerar_recibo()
 returns trigger
 language plpgsql
 as $$
 begin
   new.recibo_ano := extract(year from now())::int;
-  new.recibo_numero := fn_proximo_recibo(new.recibo_ano);
+  new.recibo_numero := fn_proximo_recibo(new.formulario, new.recibo_ano);
   return new;
 end;
 $$;

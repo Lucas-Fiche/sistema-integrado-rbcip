@@ -50,6 +50,16 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
+/* Sigla por formulário: torna o número do recibo único entre formulários */
+const SIGLAS: Record<string, string> = {
+  pagamentos: "PAG",
+  reembolso: "REE",
+  "diarias-colaboradores": "DC",
+  "diarias-bolsistas": "DB",
+};
+const codigoRecibo = (rec: any) =>
+  (SIGLAS[rec.formulario] || "REC") + "-" + (rec.recibo_numero ?? "") + "/" + (rec.recibo_ano ?? "");
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -92,7 +102,7 @@ async function tokenGoogle(): Promise<string> {
 /* ---------- Mapa de substituições por formulário ---------- */
 function substituicoes(rec: any): Record<string, string> {
   const d = rec.dados || {};
-  const numero = String(rec.recibo_numero ?? "");
+  const numero = codigoRecibo(rec);
   const nome = rec.nome || val(d, "Nome Completo");
   const cpf = rec.cpf || val(d, "CPF");
   const valor = Number(rec.valor || 0);
@@ -222,6 +232,7 @@ Deno.serve(async (req) => {
     const nomeBenef = record.nome || "-";
     const cpfBenef = record.cpf || "-";
     const valorBenef = fmtRS(Number(record.valor || 0));
+    const codigo = codigoRecibo(record);
     const rotuloForm = ({
       pagamentos: "Pagamento",
       reembolso: "Reembolso",
@@ -232,7 +243,7 @@ Deno.serve(async (req) => {
     const html = `<!doctype html><html><body style="margin:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1c2b3a">
   <div style="max-width:560px;margin:0 auto;padding:24px 16px">
     <div style="background:#17324d;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0">
-      <div style="font-size:17px;font-weight:bold">Recibo ${esc(String(record.recibo_numero))}/${esc(String(record.recibo_ano))}</div>
+      <div style="font-size:17px;font-weight:bold">Recibo ${esc(codigo)}</div>
       <div style="font-size:13px;color:#c19a3e;margin-top:2px">${esc(rotuloForm)}</div>
     </div>
     <div style="background:#fff;padding:22px;border:1px solid #e3e8ee;border-top:none;border-radius:0 0 10px 10px">
@@ -254,7 +265,7 @@ Deno.serve(async (req) => {
     await client.send({
       from: Deno.env.get("GMAIL_USER")!,
       to: destinatarios,
-      subject: semAcento(`Recibo ${record.recibo_numero}/${record.recibo_ano} - ${rotuloForm} - ${record.nome || ""}`),
+      subject: semAcento(`Recibo ${codigo} - ${rotuloForm} - ${record.nome || ""}`),
       content: "auto",
       html,
       attachments: anexos as any,
@@ -266,7 +277,7 @@ Deno.serve(async (req) => {
     docId = null;
     await db.from("submissoes").update({ recibo_enviado_em: new Date().toISOString(), recibo_path: reciboPath }).eq("id", record.id);
 
-    return json({ ok: true, numero: `${record.recibo_numero}/${record.recibo_ano}`, destinatarios });
+    return json({ ok: true, numero: codigo, destinatarios });
   } catch (err) {
     console.error(err);
     // best-effort: remove a cópia se algo falhou depois de criá-la

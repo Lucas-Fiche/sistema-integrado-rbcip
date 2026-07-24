@@ -37,7 +37,9 @@ function campoDados(sub, chave) {
   return v == null || v === "" ? "—" : v;
 }
 
-const fmtRecibo = (s) => (s.recibo_numero != null ? s.recibo_numero + "/" + s.recibo_ano : "—");
+const SIGLA_RECIBO = { pagamentos: "PAG", reembolso: "REE", "diarias-colaboradores": "DC", "diarias-bolsistas": "DB" };
+const fmtRecibo = (s) =>
+  s.recibo_numero != null ? (SIGLA_RECIBO[s.formulario] || "REC") + "-" + s.recibo_numero + "/" + s.recibo_ano : "—";
 const COL_INI = [
   { h: "Recibo", g: fmtRecibo, cls: "col-recibo" },
   { h: "Data/Hora", g: (s) => fmtData(s.criado_em) },
@@ -375,7 +377,7 @@ function abrirDetalhe(sub) {
   const body = document.getElementById("modal-body");
   document.getElementById("modal-titulo").textContent =
     (FORM_LABEL[sub.formulario] || sub.formulario) +
-    (sub.recibo_numero != null ? " · Recibo " + fmtRecibo(sub) : "") +
+    (sub.recibo_numero != null ? " · " + fmtRecibo(sub) : "") +
     " · " + fmtDataCurta(sub.criado_em);
 
   const linhas = [
