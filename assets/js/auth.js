@@ -58,15 +58,25 @@ window.rbcipAuth = {
   async meusDados() {
     const supa = await window.rbcipReady;
     if (!supa) return null;
-    // limit(1) em vez de maybeSingle: tolera eventuais registros duplicados
-    // (ex.: mesmo e-mail em mais de uma linha) sem quebrar.
-    const { data, error } = await supa
-      .from("pessoas")
-      .select("nome,email,cpf,telefone,rg,orgao_uf,chave_pix,is_staff")
-      .order("is_staff", { ascending: false })
-      .limit(1);
+    // IMPORTANTE: filtrar pelo usuário logado. Staff pode ler TODA a tabela
+    // pessoas (política de RLS), então sem este filtro a consulta traria a
+    // linha de outra pessoa. Busca pelo vínculo (auth_user_id) e, se não
+    // achar, pelo e-mail do login.
+    const { data: u } = await supa.auth.getUser();
+    const user = u && u.user;
+    if (!user) return null;
+    const cols = "nome,email,cpf,telefone,rg,orgao_uf,chave_pix,is_staff";
+    let { data, error } = await supa
+      .from("pessoas").select(cols).eq("auth_user_id", user.id).limit(1);
     if (error) console.error("meusDados erro:", error);
-    return (data && data[0]) || null;
+    if (data && data[0]) return data[0];
+    if (user.email) {
+      ({ data, error } = await supa
+        .from("pessoas").select(cols).ilike("email", user.email).limit(1));
+      if (error) console.error("meusDados erro:", error);
+      if (data && data[0]) return data[0];
+    }
+    return null;
   },
 
   async sair() {
