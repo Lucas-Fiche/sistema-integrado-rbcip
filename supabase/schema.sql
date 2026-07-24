@@ -1,5 +1,5 @@
 -- =====================================================================
---  Sistema Integrado RBCIP — Schema do banco (Supabase / PostgreSQL)
+--  Sistema de Solicitações - RBCIP — Schema do banco (Supabase / PostgreSQL)
 --  Fase 1: cadastro de pessoas, projetos e submissões dos formulários.
 --
 --  Como usar:

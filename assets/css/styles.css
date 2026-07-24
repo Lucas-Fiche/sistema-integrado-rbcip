@@ -1,5 +1,5 @@
 /* =============================================================
-   Sistema Integrado RBCIP — Formulários Institucionais
+   Sistema de Solicitações - RBCIP — Formulários Institucionais
    Estilo compartilhado (landing + formulários)
    ============================================================= */
 
@@ -386,6 +386,10 @@ textarea { min-height: 96px; resize: vertical; }
   font-size: 0.95rem;
   padding: 11px 22px;
   border-radius: var(--radius-sm);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .btn-primary { background: var(--brand); color: #fff; }

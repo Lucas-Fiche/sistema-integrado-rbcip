@@ -30,13 +30,18 @@
 .dash-nav a.ativo { background: var(--brand); color: #fff; }
 .admin-user { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; color: var(--muted); }
 
-/* Abas por formulário */
+/* Abas por formulário — controle segmentado (pílulas) */
 .tabs {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-bottom: 20px;
-  border-bottom: 2px solid var(--border);
+  margin-bottom: 22px;
+  max-width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 5px;
+  box-shadow: var(--shadow-sm);
 }
 .tab {
   appearance: none;
@@ -44,18 +49,22 @@
   background: none;
   font: inherit;
   font-weight: 600;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   color: var(--muted);
-  padding: 10px 16px;
+  padding: 9px 16px;
   cursor: pointer;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  transition: background .15s ease, color .15s ease;
 }
-.tab:hover { color: var(--brand); }
-.tab.ativa { color: var(--brand-dark); border-bottom-color: var(--brand); }
+.tab:hover { background: var(--brand-light); color: var(--brand); }
+.tab.ativa {
+  background: var(--brand);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .18);
+}
 .tab .cont {
   background: var(--brand-light);
   color: var(--brand);
@@ -63,8 +72,10 @@
   font-size: 0.72rem;
   font-weight: 700;
   padding: 1px 8px;
+  min-width: 20px;
+  text-align: center;
 }
-.tab.ativa .cont { background: var(--brand); color: #fff; }
+.tab.ativa .cont { background: rgba(255, 255, 255, .22); color: #fff; }
 
 /* Cartões de resumo */
 .stats {
@@ -169,6 +180,7 @@ table.subs tr.clicavel { cursor: pointer; }
 table.subs tr.clicavel:hover { background: var(--brand-light); }
 .col-valor { text-align: right; font-variant-numeric: tabular-nums; }
 .col-recibo { white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--brand); }
+.col-status { white-space: nowrap; }
 .vazio { padding: 40px; text-align: center; color: var(--muted); }
 
 /* Badges de status */

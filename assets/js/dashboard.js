@@ -47,19 +47,21 @@ const COL_INI = [
   { h: "CPF", g: (s) => fmtCpf(s.cpf) },
 ];
 const COL_VALOR = { h: "Valor", g: (s) => fmtValor(s.valor), cls: "col-valor" };
-const COL_STATUS = { h: "Status", g: (s) => badgeStatus(s.status), html: true };
+// Status como primeira coluna: fica sempre visível, mesmo quando a tabela das
+// diárias rola horizontalmente.
+const COL_STATUS = { h: "Status", g: (s) => badgeStatus(s.status), html: true, cls: "col-status" };
 const COL_DIARIAS = [
+  COL_STATUS,
   ...COL_INI,
   { h: "Projeto", g: (s) => s.projeto || "—" },
   { h: "Origem → Destino", g: (s) => campoDados(s, "Origem (Estado e Município)") + " → " + campoDados(s, "Destino (Estado e Município)") },
   { h: "Período", g: (s) => campoDados(s, "Período Inicial") + " → " + campoDados(s, "Período Final") },
   COL_VALOR,
-  COL_STATUS,
 ];
 
 const COLUNAS = {
-  pagamentos: [...COL_INI, { h: "Chave PIX", g: (s) => campoDados(s, "Chave Pix (CPF)") }, COL_VALOR, COL_STATUS],
-  reembolso: [...COL_INI, { h: "Categoria", g: (s) => campoDados(s, "Categoria da Despesa") }, COL_VALOR, COL_STATUS],
+  pagamentos: [COL_STATUS, ...COL_INI, { h: "Chave PIX", g: (s) => campoDados(s, "Chave Pix (CPF)") }, COL_VALOR],
+  reembolso: [COL_STATUS, ...COL_INI, { h: "Categoria", g: (s) => campoDados(s, "Categoria da Despesa") }, COL_VALOR],
   "diarias-colaboradores": COL_DIARIAS,
   "diarias-bolsistas": COL_DIARIAS,
 };
@@ -224,6 +226,16 @@ function configurarFiltros() {
     document.getElementById(id).addEventListener("change", aplicarFiltros));
   document.getElementById("f-busca").addEventListener("input", aplicarFiltros);
   document.getElementById("btn-export").addEventListener("click", exportarCSV);
+
+  const btnAtu = document.getElementById("btn-atualizar");
+  btnAtu.addEventListener("click", async () => {
+    const txt = btnAtu.textContent;
+    btnAtu.disabled = true;
+    btnAtu.textContent = "Atualizando…";
+    await carregar();
+    btnAtu.disabled = false;
+    btnAtu.textContent = txt;
+  });
 }
 
 function aplicarFiltros() {

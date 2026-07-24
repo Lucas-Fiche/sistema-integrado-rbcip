@@ -1,4 +1,4 @@
-# Sistema Integrado RBCIP — Formulários Institucionais
+# Sistema de Solicitações - RBCIP — Formulários Institucionais
 
 Versão em HTML, CSS e JavaScript (sem dependências externas) dos formulários
 institucionais que antes eram Google Forms. O objetivo é ter mais controle

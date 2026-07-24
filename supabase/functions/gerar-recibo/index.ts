@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
   <div style="max-width:560px;margin:0 auto;padding:24px 16px">
     <div style="background:#17324d;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0">
       <div style="font-size:17px;font-weight:bold">Recibo ${esc(codigo)}</div>
-      <div style="font-size:13px;color:#c19a3e;margin-top:2px">${esc(rotuloForm)}</div>
+      <div style="font-size:13px;font-weight:600;color:#f0d79a;margin-top:3px;letter-spacing:.3px">${esc(rotuloForm)}</div>
     </div>
     <div style="background:#fff;padding:22px;border:1px solid #e3e8ee;border-top:none;border-radius:0 0 10px 10px">
       <p style="margin:0 0 16px">Segue em anexo o recibo em PDF referente à solicitação abaixo.</p>
@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
         <tr><td style="padding:6px 0;color:#5a6b7b">CPF</td><td style="padding:6px 0">${esc(cpfBenef)}</td></tr>
         <tr><td style="padding:6px 0;color:#5a6b7b">Valor</td><td style="padding:6px 0;font-weight:bold">${esc(valorBenef)}</td></tr>
       </table>
-      <p style="margin:20px 0 0;font-size:12px;color:#8a97a4">Mensagem automática do Sistema Integrado RBCIP.</p>
+      <p style="margin:20px 0 0;font-size:12px;color:#8a97a4">Mensagem automática do Sistema de Solicitações - RBCIP.</p>
     </div>
   </div>
 </body></html>`;

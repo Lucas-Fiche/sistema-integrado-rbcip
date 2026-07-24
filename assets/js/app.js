@@ -290,6 +290,13 @@ function ativarFormulario(config) {
     const sucesso = document.getElementById("sucesso");
     if (sucesso) {
       form.style.display = "none";
+      // Elementos que não fazem sentido na tela de "Solicitação registrada":
+      // o aviso de campo obrigatório e a barra "Voltar aos formulários"
+      // (o próprio card de sucesso já tem o botão "Voltar ao início").
+      const note = document.querySelector(".required-note");
+      if (note) note.style.display = "none";
+      const topbar = document.querySelector(".topbar");
+      if (topbar) topbar.style.display = "none";
       sucesso.classList.add("show");
       sucesso.scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -364,7 +371,7 @@ function ativarFormulario(config) {
       '<div class="meta"><div><b>' + rotuloNum + "</b><span>" + escHtml(proto) + "</span></div>" +
       "<div><b>Data de envio</b><span>" + escHtml(fmtDataHora(registro.enviadoEm)) + "</span></div></div>" +
       "<table>" + linhas + "</table></div>" +
-      '<div class="rodape">Este comprovante confirma o registro da sua solicitação no Sistema Integrado RBCIP. ' +
+      '<div class="rodape">Este comprovante confirma o registro da sua solicitação no Sistema de Solicitações - RBCIP. ' +
       "Guarde o número de protocolo para eventuais consultas.</div></div>" +
       '<div class="acoes no-print"><button class="b1" onclick="window.print()">Imprimir / Salvar em PDF</button>' +
       '<button class="b2" onclick="window.close()">Fechar</button></div>' +
