@@ -39,6 +39,18 @@ git push origin main
 2. **Edge Functions → `gerar-recibo` → Secrets:** troque `RECIBO_DESTINATARIOS`
    para os **e-mails reais do financeiro** (separados por vírgula).
 
+## 3.1 Limpar os dados de teste (antes de valer para produção)
+
+Durante o desenvolvimento o banco acumula submissões de teste e a numeração
+dos recibos avança. Para começar a produção com a contagem limpa (o primeiro
+recibo de cada formulário vira `SIGLA-1/ANO`), rode no **SQL Editor** o arquivo
+[`supabase/limpar_dados_teste.sql`](supabase/limpar_dados_teste.sql).
+
+> ⚠️ Ele **apaga todas as submissões** e zera os contadores de recibo — não há
+> como desfazer. Rode apenas quando tiver certeza de que os registros são de
+> teste. Os arquivos físicos do Storage (buckets `comprovantes` e `recibos`)
+> podem ser removidos pelo painel **Storage → Delete**.
+
 ## 4. Conferir
 
 - Abra a URL da Vercel, envie um **Pagamento** (público) e confirme:
