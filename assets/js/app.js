@@ -445,10 +445,11 @@ function ativarFormulario(config) {
       if (window.rbcipAuth && window.rbcipAuth.meusDados) {
         try { eu = await window.rbcipAuth.meusDados(); } catch (_) { eu = null; }
       }
-      if (eu && (eu.nome || eu.email)) {
+      const emailConta = (eu && (eu.email_login || eu.email)) || "";
+      if (eu && (eu.nome || emailConta)) {
         // Logado: os dados vêm da conta (não precisa digitar nem dá para forjar)
         qpLogado.innerHTML = "Preenchido por <b>" + escHtml(eu.nome || "—") + "</b>" +
-          (eu.email ? " · " + escHtml(eu.email) : "") +
+          (emailConta ? " · " + escHtml(emailConta) : "") +
           "<br /><small>Registrado automaticamente pela sua conta.</small>";
         qpLogado.hidden = false;
         qpCampos.hidden = true;

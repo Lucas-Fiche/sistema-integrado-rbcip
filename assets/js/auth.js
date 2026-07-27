@@ -66,15 +66,18 @@ window.rbcipAuth = {
     const user = u && u.user;
     if (!user) return null;
     const cols = "nome,email,cpf,telefone,rg,orgao_uf,chave_pix,is_staff";
+    // email_login vem da sessão: é o e-mail de verdade da conta, imune a
+    // divergências no cadastro. Use-o para identificar o usuário na tela.
+    const extra = { email_login: user.email || null };
     let { data, error } = await supa
       .from("pessoas").select(cols).eq("auth_user_id", user.id).limit(1);
     if (error) console.error("meusDados erro:", error);
-    if (data && data[0]) return data[0];
+    if (data && data[0]) return { ...data[0], ...extra };
     if (user.email) {
       ({ data, error } = await supa
         .from("pessoas").select(cols).ilike("email", user.email).limit(1));
       if (error) console.error("meusDados erro:", error);
-      if (data && data[0]) return data[0];
+      if (data && data[0]) return { ...data[0], ...extra };
     }
     return null;
   },
