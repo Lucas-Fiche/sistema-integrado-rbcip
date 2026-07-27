@@ -16,6 +16,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { PDFDocument, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 
 /* ---------- Valor por extenso ---------- */
 const UNI = ["zero","um","dois","três","quatro","cinco","seis","sete","oito","nove","dez","onze","doze","treze","quatorze","quinze","dezesseis","dezessete","dezoito","dezenove"];
@@ -48,6 +49,49 @@ function toBase64(bytes: Uint8Array): string {
   let bin = ""; const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
   return btoa(bin);
+}
+
+/* ---------- Une o comprovante ao PDF do recibo (documento único) ----------
+   O comprovante pode ser imagem (JPG/PNG) ou um PDF. Em ambos os casos vira
+   página(s) adicional(is) do próprio recibo, para o financeiro receber um
+   arquivo só. Se o formato não for suportado, devolve o recibo original. */
+async function anexarComprovante(
+  reciboPdf: Uint8Array,
+  comprovante: Uint8Array,
+  nome: string,
+): Promise<Uint8Array> {
+  const doc = await PDFDocument.load(reciboPdf);
+  const ext = (nome.split(".").pop() || "").toLowerCase();
+  const ehPdf = ext === "pdf" || (comprovante[0] === 0x25 && comprovante[1] === 0x50); // "%P"
+
+  if (ehPdf) {
+    const anexo = await PDFDocument.load(comprovante);
+    const paginas = await doc.copyPages(anexo, anexo.getPageIndices());
+    paginas.forEach((p) => doc.addPage(p));
+  } else {
+    // JPG começa com FF D8; PNG com 89 50 4E 47
+    const ehPng = comprovante[0] === 0x89 && comprovante[1] === 0x50;
+    const ehJpg = comprovante[0] === 0xff && comprovante[1] === 0xd8;
+    if (!ehPng && !ehJpg) return reciboPdf;
+    const img = ehPng ? await doc.embedPng(comprovante) : await doc.embedJpg(comprovante);
+
+    // Página A4 retrato, imagem centralizada com margem, mantendo proporção
+    const A4_L = 595.28, A4_A = 841.89, margem = 36;
+    const pagina = doc.addPage([A4_L, A4_A]);
+    const maxL = A4_L - margem * 2, maxA = A4_A - margem * 2 - 24;
+    const escala = Math.min(maxL / img.width, maxA / img.height, 1);
+    const l = img.width * escala, a = img.height * escala;
+    pagina.drawText("Comprovante anexado", {
+      x: margem, y: A4_A - margem, size: 11, color: rgb(0.35, 0.4, 0.46),
+    });
+    pagina.drawImage(img, {
+      x: (A4_L - l) / 2,
+      y: (A4_A - 24 - a) / 2,
+      width: l,
+      height: a,
+    });
+  }
+  return await doc.save();
 }
 
 /* Sigla por formulário: torna o número do recibo único entre formulários */
@@ -135,7 +179,7 @@ function substituicoes(rec: any): Record<string, string> {
       "<<Chave_Pix>>": val(d, "Chave Pix (CPF)"),
       "<<Data_Atual>>": data,
       "<<Nome_Assinatura>>": nome,
-      "<<Link Imagem Autocrat>>": "(comprovante anexado ao e-mail)",
+      "<<Link Imagem Autocrat>>": "(comprovante na última página deste documento)",
     };
   }
   return {
@@ -204,24 +248,34 @@ Deno.serve(async (req) => {
       headers: { Authorization: `Bearer ${gtoken}` },
     });
     if (!exp.ok) throw new Error("Drive export: " + await exp.text());
-    const pdfBytes = new Uint8Array(await exp.arrayBuffer());
-    const pdfB64 = toBase64(pdfBytes);
+    let pdfBytes = new Uint8Array(await exp.arrayBuffer());
 
-    // 4. Monta anexos (PDF + comprovante do reembolso)
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    // Guarda o PDF no Storage para o dashboard poder exibir
+    // 4. Reembolso: anexa o comprovante como página do MESMO PDF
+    //    (antes ia solto no e-mail; o financeiro precisa de um arquivo só)
+    if (record.formulario === "reembolso") {
+      const caminho = record.dados?.["Anexar Comprovante/Recibo"];
+      if (caminho && !/\s/.test(caminho)) {
+        try {
+          const { data } = await db.storage.from("comprovantes").download(caminho);
+          if (data) {
+            const bytes = new Uint8Array(await data.arrayBuffer());
+            pdfBytes = await anexarComprovante(pdfBytes, bytes, caminho);
+          }
+        } catch (e) {
+          // Comprovante ilegível não pode impedir o envio do recibo
+          console.error("anexar comprovante ao PDF falhou:", e);
+        }
+      }
+    }
+    const pdfB64 = toBase64(pdfBytes);
+
+    // Guarda o PDF (já com o comprovante) no Storage para o dashboard exibir
     const reciboPath = `${record.id}-${record.recibo_ano}-${record.recibo_numero}.pdf`;
     await db.storage.from("recibos").upload(reciboPath, pdfBytes, { contentType: "application/pdf", upsert: true });
     const nomeArq = `recibo-${record.formulario}-${record.recibo_numero}-${record.recibo_ano}.pdf`;
     const anexos: Record<string, unknown>[] = [{ filename: nomeArq, content: pdfB64, encoding: "base64", contentType: "application/pdf" }];
-    if (record.formulario === "reembolso") {
-      const caminho = record.dados?.["Anexar Comprovante/Recibo"];
-      if (caminho && !/\s/.test(caminho)) {
-        const { data } = await db.storage.from("comprovantes").download(caminho);
-        if (data) anexos.push({ filename: caminho.split("/").pop() || "comprovante", content: toBase64(new Uint8Array(await data.arrayBuffer())), encoding: "base64" });
-      }
-    }
 
     // 5. Envia por e-mail
     const destinatarios = (Deno.env.get("RECIBO_DESTINATARIOS") || "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -247,7 +301,9 @@ Deno.serve(async (req) => {
       <div style="font-size:13px;font-weight:600;color:#f0d79a;margin-top:3px;letter-spacing:.3px">${esc(rotuloForm)}</div>
     </div>
     <div style="background:#fff;padding:22px;border:1px solid #e3e8ee;border-top:none;border-radius:0 0 10px 10px">
-      <p style="margin:0 0 16px">Segue em anexo o recibo em PDF referente à solicitação abaixo.</p>
+      <p style="margin:0 0 16px">Segue em anexo o recibo em PDF referente à solicitação abaixo.${
+        record.formulario === "reembolso" ? " O comprovante está incluído na última página do mesmo arquivo." : ""
+      }</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px">
         <tr><td style="padding:6px 0;color:#5a6b7b;width:130px">Beneficiário</td><td style="padding:6px 0;font-weight:bold">${esc(nomeBenef)}</td></tr>
         <tr><td style="padding:6px 0;color:#5a6b7b">CPF</td><td style="padding:6px 0">${esc(cpfBenef)}</td></tr>

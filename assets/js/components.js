@@ -7,6 +7,10 @@
    ============================================================= */
 
 const REQ = '<span class="req">*</span>';
+const OPC = '<span class="opcional">(opcional)</span>';
+// Marca do rótulo e atributo required, conforme o campo seja obrigatório
+const marca = (obrig) => (obrig ? REQ : OPC);
+const attr = (obrig) => (obrig ? "required " : "");
 
 /* ---------- Campos individuais do bloco de colaborador ---------- */
 
@@ -38,11 +42,11 @@ function campoNomeSelect() {
     </div>`;
 }
 
-function campoEmail() {
+function campoEmail(obrig = true) {
   return `
     <div class="field" data-label="Email">
-      <label>Email ${REQ}</label>
-      <input type="email" name="email" required />
+      <label>Email ${marca(obrig)}</label>
+      <input type="email" name="email" ${attr(obrig)}/>
       <span class="error"></span>
     </div>`;
 }
@@ -57,22 +61,22 @@ function campoCPF() {
     </div>`;
 }
 
-function campoRG() {
+function campoRG(obrig = true) {
   return `
     <div class="field" data-label="RG">
-      <label>RG ${REQ}</label>
+      <label>RG ${marca(obrig)}</label>
       <span class="hint">Por favor, digite APENAS LETRAS E NÚMEROS.</span>
-      <input type="text" name="rg" data-mask="alnum" required />
+      <input type="text" name="rg" data-mask="alnum" ${attr(obrig)}/>
       <span class="error"></span>
     </div>`;
 }
 
-function campoOrgaoUF() {
+function campoOrgaoUF(obrig = true) {
   return `
     <div class="field" data-label="Órgão Emissor / UF" data-validate="orgao-uf">
-      <label>Órgão Emissor / UF ${REQ}</label>
+      <label>Órgão Emissor / UF ${marca(obrig)}</label>
       <span class="hint">Digite seguindo o formato: SSP/DF</span>
-      <input type="text" name="orgao_uf" placeholder="SSP/DF" required />
+      <input type="text" name="orgao_uf" placeholder="SSP/DF" ${attr(obrig)}/>
       <span class="error"></span>
     </div>`;
 }
@@ -106,18 +110,21 @@ function campoConfirmacaoPix() {
 }
 
 /* ---------- Seção 1 – Dados do Colaborador ----------
-   opts.nome    : "texto" (padrão) ou "select" (base de bolsistas)
-   opts.projeto : true para incluir o campo Projeto de Referência
+   opts.nome      : "texto" (padrão) ou "select" (base de bolsistas)
+   opts.projeto   : true para incluir o campo Projeto de Referência
+   opts.opcionais : lista de campos não obrigatórios
+                    (ex.: ["email", "rg", "orgao_uf"] no Pagamento)
 */
 function secaoDadosColaborador(opts = {}) {
-  const { nome = "texto", projeto = false } = opts;
+  const { nome = "texto", projeto = false, opcionais = [] } = opts;
+  const obrig = (campo) => !opcionais.includes(campo);
   const campos = [
     projeto ? campoProjeto() : "",
     nome === "select" ? campoNomeSelect() : campoNomeTexto(),
-    campoEmail(),
+    campoEmail(obrig("email")),
     campoCPF(),
-    campoRG(),
-    campoOrgaoUF(),
+    campoRG(obrig("rg")),
+    campoOrgaoUF(obrig("orgao_uf")),
     campoChavePix(),
     campoConfirmacaoPix(),
   ].join("");
