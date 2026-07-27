@@ -56,6 +56,27 @@ update pessoas set is_staff = false where cpf = 'CPF_SO_DIGITOS';
 (Opcional: apague o usuário em Authentication → Users se ele não precisar mais
 acessar os formulários.)
 
+## Auditoria (quem alterou o quê)
+
+Toda mudança de status é registrada na tabela `submissoes_log` por uma trigger
+no banco (`schema_auditoria.sql`) — não depende do navegador, então não há como
+burlar pelo cliente. Cada linha guarda: solicitação, status anterior, status
+novo, autor (`auth_user_id` + nome/e-mail no momento da ação) e data/hora.
+
+O histórico aparece no modal de detalhe de cada solicitação, no painel.
+
+Consulta direta no SQL Editor (ex.: tudo que uma pessoa fez):
+```sql
+select l.criado_em, l.autor_nome, l.de, l.para, s.formulario, s.nome
+from submissoes_log l
+join submissoes s on s.id = l.submissao_id
+order by l.criado_em desc;
+```
+
+O log é **somente leitura** pela API: só staff consegue ler e não há política de
+INSERT/UPDATE/DELETE, então nem um admin consegue apagar ou editar o histórico
+(apenas a trigger escreve).
+
 ## Observações
 
 - **Só admins têm senha/painel.** Usuários comuns (bolsistas/colaboradores)

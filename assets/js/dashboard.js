@@ -409,9 +409,11 @@ function abrirDetalhe(sub) {
     : `<p class="vazio-min" style="margin-bottom:16px">Recibo ainda não disponível para esta solicitação.</p>`;
   body.innerHTML = recibo + linhas
     .map(([k, v]) => `<div class="det-linha"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`)
-    .join("");
+    .join("") +
+    '<div id="historico"><p class="vazio-min" style="margin-top:16px">Carregando histórico…</p></div>';
   const btnRecibo = document.getElementById("ver-recibo");
   if (btnRecibo) btnRecibo.onclick = () => verRecibo(sub.recibo_path, btnRecibo);
+  renderHistorico(sub.id);
 
   // Botões de status
   const acoes = document.getElementById("acoes-status");
@@ -423,6 +425,40 @@ function abrirDetalhe(sub) {
   });
 
   document.getElementById("modal-bg").classList.add("aberto");
+}
+
+// Histórico de alterações de status (quem mudou, de quê para quê e quando)
+async function renderHistorico(submissaoId) {
+  const el = document.getElementById("historico");
+  if (!el) return;
+  const { data, error } = await supa
+    .from("submissoes_log")
+    .select("de,para,autor_nome,autor_email,criado_em")
+    .eq("submissao_id", submissaoId)
+    .order("criado_em", { ascending: false });
+
+  if (error) {
+    // Tabela ainda não criada (schema_auditoria.sql não executado): não polui a tela
+    console.error("historico:", error);
+    el.innerHTML = "";
+    return;
+  }
+  const titulo = '<h3 class="hist-titulo">Histórico de alterações</h3>';
+  if (!data || !data.length) {
+    el.innerHTML = titulo +
+      '<p class="vazio-min">Nenhuma alteração de status registrada até agora.</p>';
+    return;
+  }
+  el.innerHTML = titulo + '<ul class="hist">' + data.map((h) => {
+    const autor = h.autor_nome && h.autor_nome !== "(desconhecido)"
+      ? h.autor_nome
+      : (h.autor_email || "Autor não identificado");
+    return '<li class="hist-item">' +
+      '<span class="hist-mov">' + badgeStatus(h.de || "pendente") +
+      '<span class="hist-seta">→</span>' + badgeStatus(h.para) + "</span>" +
+      '<span class="hist-meta">por <b>' + esc(autor) + "</b> · " + fmtData(h.criado_em) + "</span>" +
+      "</li>";
+  }).join("") + "</ul>";
 }
 
 // Abre o PDF do recibo (URL assinada temporária; acesso só de staff via RLS)
