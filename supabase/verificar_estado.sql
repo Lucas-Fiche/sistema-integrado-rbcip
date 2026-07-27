@@ -112,20 +112,21 @@ with checagens as (
   select 'bucket comprovantes (privado)',
          exists (select 1 from storage.buckets where id='comprovantes' and public = false),
          'rode schema_recibo.sql (seção 6)'
+
+  -- Contas de acesso ao painel (uma linha por usuário)
+  union all
+  select 'acesso: ' || u.email,
+         (p.auth_user_id is not null and coalesce(p.is_staff, false)),
+         case when p.auth_user_id is null
+                then 'sem vínculo em pessoas — rode o update de auth_user_id'
+              when not coalesce(p.is_staff, false)
+                then 'não é staff — update pessoas set is_staff = true'
+              else '' end
+    from auth.users u
+    left join pessoas p on p.auth_user_id = u.id
 )
 select case when ok then '✅' else '❌' end as status,
        item,
        case when ok then '' else acao end as o_que_fazer
   from checagens
  order by ok, item;
-
--- ---------------------------------------------------------------------
--- Conferência dos acessos de gestão (deve bater com quem tem painel)
--- ---------------------------------------------------------------------
-select u.email as email_login,
-       p.nome, p.is_staff,
-       case when p.auth_user_id is null then '❌ sem vínculo — não verá dados'
-            else '✅ ok' end as situacao
-  from auth.users u
-  left join pessoas p on p.auth_user_id = u.id
- order by u.email;
