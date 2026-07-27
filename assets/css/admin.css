@@ -273,25 +273,24 @@ table.subs tr.clicavel:hover { background: var(--brand-light); }
   .dash-nav a { flex: 1; text-align: center; padding: 9px 10px; }
   .admin-user { width: 100%; justify-content: space-between; }
 
-  /* Abas: uma única linha deslizável (em vez de embaralhar em 3 linhas) */
+  /* Abas: grade 2x2 — as 4 cabem na tela, sem corte e sem rolagem lateral */
   .tabs {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
     width: 100%;
     border-radius: 10px;
   }
-  .tabs::-webkit-scrollbar { display: none; }
   .tab {
-    flex: 0 0 auto;
-    scroll-snap-align: start;
-    white-space: nowrap;
-    font-size: 0.85rem;
-    padding: 9px 13px;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.8rem;
+    padding: 10px 8px;
+    gap: 6px;
+    min-width: 0;
+    line-height: 1.25;
   }
+  .tab .cont { flex: none; font-size: 0.68rem; padding: 1px 6px; }
 
   /* Cartões de resumo: 2 colunas, valor sempre em uma linha */
   .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
@@ -307,7 +306,16 @@ table.subs tr.clicavel:hover { background: var(--brand-light); }
   .filtros .campo.acao { flex: 1 1 calc(50% - 5px); }
   .filtros .campo.acao label { display: none; }
   .filtros .campo.acao .btn { width: 100%; padding: 10px 12px; }
-  .filtros input, .filtros select { width: 100%; }
+  .filtros input, .filtros select { width: 100%; min-width: 0; max-width: 100%; }
+  /* iOS: input[type=date] tem largura intrínseca própria e ignora width:100%,
+     estourando o cartão. appearance:none devolve o controle do tamanho. */
+  .filtros input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    box-sizing: border-box;
+    height: 38px;
+  }
 
   /* Tabela: Status fixo à esquerda enquanto o resto rola */
   table.subs { font-size: 0.84rem; }
