@@ -45,6 +45,29 @@
           "</div>";
       }
 
+      // Traduz as falhas conhecidas do Supabase para uma orientação prática
+      function traduzirErro(error) {
+        const m = (error && error.message || "").toLowerCase();
+        if (/different from the old|should be different/.test(m)) {
+          return "Esta senha é igual à anterior. Escolha uma senha diferente.";
+        }
+        if (/weak|easy to guess|pwned|compromised/.test(m)) {
+          return "Esta senha é muito comum e foi recusada por segurança. " +
+                 "Escolha outra, com letras, números e símbolos.";
+        }
+        if (/at least|too short|length/.test(m)) {
+          return "A senha é curta demais para as regras do sistema. Use uma senha mais longa.";
+        }
+        if (/session|jwt|token|expired|missing sub|not authenticated/.test(m)) {
+          return "O link de definição de senha expirou enquanto a página estava aberta. " +
+                 'Peça um novo link em “Esqueci / definir minha senha” e conclua logo após abri-lo.';
+        }
+        if (/rate|too many/.test(m)) {
+          return "Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.";
+        }
+        return "Não foi possível salvar a senha.";
+      }
+
       // Qualquer falha inesperada precisa aparecer, não virar página branca
       window.addEventListener("error", () => {
         if (alvo && /Carregando/.test(alvo.textContent)) {
@@ -105,7 +128,10 @@
         btn.disabled = true;
         const { error } = await supa.auth.updateUser({ password: s1 });
         if (error) {
-          msg.textContent = "Não foi possível salvar. Tente novamente.";
+          console.error("updateUser:", error);
+          msg.innerHTML = traduzirErro(error) +
+            '<br /><small style="opacity:.8">Detalhe técnico: ' +
+            (error.message || "").replace(/[<>]/g, "") + "</small>";
           btn.disabled = false;
           return;
         }
