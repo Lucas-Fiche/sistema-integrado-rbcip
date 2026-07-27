@@ -260,3 +260,81 @@ table.subs tr.clicavel:hover { background: var(--brand-light); }
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px 28px;
 }
+
+/* =============================================================
+   Responsivo — telas pequenas (celular)
+   ============================================================= */
+@media (max-width: 720px) {
+  .admin-wrap { padding: 16px 14px 48px; }
+
+  /* Barra superior: navegação e usuário empilhados */
+  .admin-top { gap: 10px; margin-bottom: 16px; }
+  .dash-nav { width: 100%; }
+  .dash-nav a { flex: 1; text-align: center; padding: 9px 10px; }
+  .admin-user { width: 100%; justify-content: space-between; }
+
+  /* Abas: uma única linha deslizável (em vez de embaralhar em 3 linhas) */
+  .tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    width: 100%;
+    border-radius: 10px;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    padding: 9px 13px;
+  }
+
+  /* Cartões de resumo: 2 colunas, valor sempre em uma linha */
+  .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  .stat { padding: 12px 14px; }
+  .stat .rotulo { font-size: 0.68rem; letter-spacing: 0.3px; }
+  .stat .valor { font-size: 1.15rem; white-space: nowrap; margin-top: 2px; }
+  /* Cartão sozinho na última linha ocupa a largura toda */
+  .stats .stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+  /* Filtros: cada campo em uma linha; botões lado a lado */
+  .filtros { padding: 12px 13px; gap: 10px; margin-bottom: 14px; }
+  .filtros .campo { flex: 1 1 100%; min-width: 0; }
+  .filtros .campo.acao { flex: 1 1 calc(50% - 5px); }
+  .filtros .campo.acao label { display: none; }
+  .filtros .campo.acao .btn { width: 100%; padding: 10px 12px; }
+  .filtros input, .filtros select { width: 100%; }
+
+  /* Tabela: Status fixo à esquerda enquanto o resto rola */
+  table.subs { font-size: 0.84rem; }
+  table.subs th, table.subs td { padding: 10px 11px; }
+  table.subs th:first-child, table.subs td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--surface);
+    box-shadow: 1px 0 0 var(--border);
+  }
+  table.subs thead th:first-child { background: #f7f9fb; }
+  table.subs tr.clicavel:hover td:first-child { background: var(--brand-light); }
+
+  /* Modal: rótulo acima do valor (não espreme o texto) */
+  .modal-bg { padding: 12px 10px; }
+  .modal { max-height: calc(100vh - 24px); }
+  .modal-head { padding: 14px 16px; }
+  .modal-head h2 { font-size: 1rem; }
+  .modal-body { padding: 14px 16px; }
+  .modal-foot { padding: 12px 16px; }
+  .det-linha { flex-direction: column; gap: 2px; padding: 9px 0; }
+  .det-linha .k { flex: none; font-size: 0.78rem; }
+  .btn-status { flex: 1 1 calc(50% - 4px); padding: 9px 10px; }
+
+  /* Gráficos (Acompanhamento): uma coluna, rótulo mais estreito */
+  .graficos { grid-template-columns: 1fr; gap: 12px; }
+  .grafico { padding: 14px 15px; }
+  .barra-row { grid-template-columns: 84px 1fr auto; gap: 8px; font-size: 0.78rem; }
+}
