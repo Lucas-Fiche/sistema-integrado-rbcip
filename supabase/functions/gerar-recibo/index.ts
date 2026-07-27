@@ -16,7 +16,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
-import { PDFDocument, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
 
 /* ---------- Valor por extenso ---------- */
 const UNI = ["zero","um","dois","três","quatro","cinco","seis","sete","oito","nove","dez","onze","doze","treze","quatorze","quinze","dezesseis","dezessete","dezoito","dezenove"];
@@ -51,46 +51,70 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-/* ---------- Une o comprovante ao PDF do recibo (documento único) ----------
-   O comprovante pode ser imagem (JPG/PNG) ou um PDF. Em ambos os casos vira
-   página(s) adicional(is) do próprio recibo, para o financeiro receber um
-   arquivo só. Se o formato não for suportado, devolve o recibo original. */
-async function anexarComprovante(
-  reciboPdf: Uint8Array,
-  comprovante: Uint8Array,
-  nome: string,
-): Promise<Uint8Array> {
-  const doc = await PDFDocument.load(reciboPdf);
-  const ext = (nome.split(".").pop() || "").toLowerCase();
-  const ehPdf = ext === "pdf" || (comprovante[0] === 0x25 && comprovante[1] === 0x50); // "%P"
+/* ---------- Tipo e dimensões do comprovante ---------- */
+const ehPdfBytes = (b: Uint8Array) => b[0] === 0x25 && b[1] === 0x50; // "%P"
+const ehPngBytes = (b: Uint8Array) => b[0] === 0x89 && b[1] === 0x50;
+const ehJpgBytes = (b: Uint8Array) => b[0] === 0xff && b[1] === 0xd8;
 
-  if (ehPdf) {
-    const anexo = await PDFDocument.load(comprovante);
-    const paginas = await doc.copyPages(anexo, anexo.getPageIndices());
-    paginas.forEach((p) => doc.addPage(p));
-  } else {
-    // JPG começa com FF D8; PNG com 89 50 4E 47
-    const ehPng = comprovante[0] === 0x89 && comprovante[1] === 0x50;
-    const ehJpg = comprovante[0] === 0xff && comprovante[1] === 0xd8;
-    if (!ehPng && !ehJpg) return reciboPdf;
-    const img = ehPng ? await doc.embedPng(comprovante) : await doc.embedJpg(comprovante);
-
-    // Página A4 retrato, imagem centralizada com margem, mantendo proporção
-    const A4_L = 595.28, A4_A = 841.89, margem = 36;
-    const pagina = doc.addPage([A4_L, A4_A]);
-    const maxL = A4_L - margem * 2, maxA = A4_A - margem * 2 - 24;
-    const escala = Math.min(maxL / img.width, maxA / img.height, 1);
-    const l = img.width * escala, a = img.height * escala;
-    pagina.drawText("Comprovante anexado", {
-      x: margem, y: A4_A - margem, size: 11, color: rgb(0.35, 0.4, 0.46),
-    });
-    pagina.drawImage(img, {
-      x: (A4_L - l) / 2,
-      y: (A4_A - 24 - a) / 2,
-      width: l,
-      height: a,
-    });
+/* Lê largura/altura sem decodificar a imagem inteira, para calcular o
+   tamanho de inserção no Google Docs mantendo a proporção. */
+function dimensoesImagem(b: Uint8Array): { w: number; h: number } | null {
+  if (ehPngBytes(b)) {
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    return { w: dv.getUint32(16), h: dv.getUint32(20) }; // após o IHDR
   }
+  if (ehJpgBytes(b)) {
+    let i = 2;
+    while (i < b.length - 9) {
+      if (b[i] !== 0xff) { i++; continue; }
+      const m = b[i + 1];
+      // marcadores SOF (dimensões), exceto DHT/DAC/RSTn
+      const ehSOF = (m >= 0xc0 && m <= 0xcf) && m !== 0xc4 && m !== 0xc8 && m !== 0xcc;
+      const tam = (b[i + 2] << 8) | b[i + 3];
+      if (ehSOF) {
+        return { h: (b[i + 5] << 8) | b[i + 6], w: (b[i + 7] << 8) | b[i + 8] };
+      }
+      i += 2 + tam;
+    }
+  }
+  return null;
+}
+
+/* Localiza o índice de um marcador no corpo do documento do Google Docs.
+   O marcador entra via replaceAllText, então fica num único textRun. */
+function acharIndice(doc: any, marcador: string): number | null {
+  const busca = (elems: any[]): number | null => {
+    for (const el of elems || []) {
+      const p = el.paragraph;
+      if (p) {
+        for (const e of p.elements || []) {
+          const t = e.textRun?.content;
+          if (t && t.includes(marcador)) {
+            return e.startIndex + t.indexOf(marcador);
+          }
+        }
+      }
+      if (el.table) {
+        for (const linha of el.table.tableRows || []) {
+          for (const c of linha.tableCells || []) {
+            const r = busca(c.content);
+            if (r != null) return r;
+          }
+        }
+      }
+    }
+    return null;
+  };
+  return busca(doc.body?.content);
+}
+
+/* ---------- Anexa um comprovante em PDF como páginas do recibo ----------
+   Usado só quando o comprovante é PDF (imagens vão dentro do modelo). */
+async function anexarPdf(reciboPdf: Uint8Array, anexoPdf: Uint8Array): Promise<Uint8Array> {
+  const doc = await PDFDocument.load(reciboPdf);
+  const anexo = await PDFDocument.load(anexoPdf);
+  const paginas = await doc.copyPages(anexo, anexo.getPageIndices());
+  paginas.forEach((p) => doc.addPage(p));
   return await doc.save();
 }
 
@@ -231,8 +255,35 @@ Deno.serve(async (req) => {
     if (!copyResp.ok) throw new Error("Drive copy: " + await copyResp.text());
     docId = (await copyResp.json()).id;
 
-    // 2. Substitui os campos
+    const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // 2. Reembolso: baixa o comprovante antes, para saber se é imagem ou PDF
+    const MARCADOR = "@@COMPROVANTE@@";
+    let compBytes: Uint8Array | null = null;
+    let compCaminho = "";
+    if (record.formulario === "reembolso") {
+      const caminho = record.dados?.["Anexar Comprovante/Recibo"];
+      if (caminho && !/\s/.test(caminho)) {
+        try {
+          const { data } = await db.storage.from("comprovantes").download(caminho);
+          if (data) { compBytes = new Uint8Array(await data.arrayBuffer()); compCaminho = caminho; }
+        } catch (e) {
+          console.error("download do comprovante falhou:", e);
+        }
+      }
+    }
+    const compEhImagem = !!compBytes && !ehPdfBytes(compBytes) &&
+      (ehPngBytes(compBytes) || ehJpgBytes(compBytes));
+
+    // 3. Substitui os campos. Para imagem, o placeholder do modelo recebe um
+    //    marcador — a imagem entra ali (página reservada no modelo), evitando
+    //    uma página extra em branco.
     const reps = substituicoes(record);
+    if (record.formulario === "reembolso") {
+      reps["<<Link Imagem Autocrat>>"] = compEhImagem
+        ? MARCADOR
+        : (compBytes ? "(comprovante nas páginas seguintes)" : "(sem comprovante anexado)");
+    }
     const requests = Object.entries(reps).map(([text, replaceText]) => ({
       replaceAllText: { containsText: { text, matchCase: true }, replaceText: replaceText || "—" },
     }));
@@ -243,30 +294,61 @@ Deno.serve(async (req) => {
     });
     if (!upd.ok) throw new Error("Docs batchUpdate: " + await upd.text());
 
-    // 3. Exporta em PDF
+    // 4. Insere a imagem do comprovante no lugar do marcador
+    if (compEhImagem && compBytes) {
+      try {
+        const { data: assinada } = await db.storage
+          .from("comprovantes").createSignedUrl(compCaminho, 600);
+        if (!assinada?.signedUrl) throw new Error("sem URL assinada");
+
+        const docResp = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+          headers: { Authorization: `Bearer ${gtoken}` },
+        });
+        if (!docResp.ok) throw new Error("Docs get: " + await docResp.text());
+        const idx = acharIndice(await docResp.json(), MARCADOR);
+        if (idx == null) throw new Error("marcador não encontrado no modelo");
+
+        // Encaixa na área útil da página mantendo a proporção
+        const MAX_L = 440, MAX_A = 560;
+        const dim = dimensoesImagem(compBytes);
+        const escala = dim ? Math.min(MAX_L / dim.w, MAX_A / dim.h, 1) : 1;
+        const tamanho = dim
+          ? {
+              width: { magnitude: Math.round(dim.w * escala), unit: "PT" },
+              height: { magnitude: Math.round(dim.h * escala), unit: "PT" },
+            }
+          : { width: { magnitude: MAX_L, unit: "PT" } };
+
+        const ins = await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${gtoken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requests: [
+              { deleteContentRange: { range: { startIndex: idx, endIndex: idx + MARCADOR.length } } },
+              { insertInlineImage: { location: { index: idx }, uri: assinada.signedUrl, objectSize: tamanho } },
+            ],
+          }),
+        });
+        if (!ins.ok) throw new Error("insertInlineImage: " + await ins.text());
+      } catch (e) {
+        // Falha ao embutir não pode impedir o envio do recibo
+        console.error("inserir comprovante no documento falhou:", e);
+      }
+    }
+
+    // 5. Exporta em PDF
     const exp = await fetch(`https://www.googleapis.com/drive/v3/files/${docId}/export?mimeType=application/pdf`, {
       headers: { Authorization: `Bearer ${gtoken}` },
     });
     if (!exp.ok) throw new Error("Drive export: " + await exp.text());
     let pdfBytes = new Uint8Array(await exp.arrayBuffer());
 
-    const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-
-    // 4. Reembolso: anexa o comprovante como página do MESMO PDF
-    //    (antes ia solto no e-mail; o financeiro precisa de um arquivo só)
-    if (record.formulario === "reembolso") {
-      const caminho = record.dados?.["Anexar Comprovante/Recibo"];
-      if (caminho && !/\s/.test(caminho)) {
-        try {
-          const { data } = await db.storage.from("comprovantes").download(caminho);
-          if (data) {
-            const bytes = new Uint8Array(await data.arrayBuffer());
-            pdfBytes = await anexarComprovante(pdfBytes, bytes, caminho);
-          }
-        } catch (e) {
-          // Comprovante ilegível não pode impedir o envio do recibo
-          console.error("anexar comprovante ao PDF falhou:", e);
-        }
+    // 6. Comprovante em PDF: entra como páginas seguintes do mesmo arquivo
+    if (compBytes && !compEhImagem && ehPdfBytes(compBytes)) {
+      try {
+        pdfBytes = await anexarPdf(pdfBytes, compBytes);
+      } catch (e) {
+        console.error("anexar PDF do comprovante falhou:", e);
       }
     }
     const pdfB64 = toBase64(pdfBytes);
@@ -302,7 +384,7 @@ Deno.serve(async (req) => {
     </div>
     <div style="background:#fff;padding:22px;border:1px solid #e3e8ee;border-top:none;border-radius:0 0 10px 10px">
       <p style="margin:0 0 16px">Segue em anexo o recibo em PDF referente à solicitação abaixo.${
-        record.formulario === "reembolso" ? " O comprovante está incluído na última página do mesmo arquivo." : ""
+        record.formulario === "reembolso" ? " O comprovante está incluído no mesmo arquivo." : ""
       }</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px">
         <tr><td style="padding:6px 0;color:#5a6b7b;width:130px">Beneficiário</td><td style="padding:6px 0;font-weight:bold">${esc(nomeBenef)}</td></tr>

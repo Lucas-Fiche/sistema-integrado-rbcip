@@ -517,7 +517,12 @@ textarea { min-height: 96px; resize: vertical; }
   border-radius: 6px;
   padding: 8px 11px;
 }
+/* [hidden] é só display:none do navegador — um display explícito o venceria */
+.quem-preenche [hidden], .terceiro-box [hidden] { display: none !important; }
 .qp-campos { display: grid; gap: 12px; }
 .qp-campos label { font-weight: 600; font-size: 0.9rem; display: block; }
 .qp-campos input { margin-top: 4px; }
 @media (min-width: 560px) { .qp-campos { grid-template-columns: 1fr 1fr; } .qp-campos .error { grid-column: 1 / -1; } }
+
+/* Prévia de comprovante em PDF (sem miniatura de imagem) */
+.file-preview .file-icone { font-size: 1.6rem; line-height: 1; }

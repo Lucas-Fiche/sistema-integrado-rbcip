@@ -228,16 +228,28 @@ function ativarFormulario(config) {
       clearEstado(field);
       const f = inp.files && inp.files[0];
       if (!f) return;
-      if (!f.type.startsWith("image/")) { setError(field, "O comprovante deve ser uma imagem (JPG ou PNG)."); inp.value = ""; return; }
-      if (f.size > 8 * 1024 * 1024) { setError(field, "Imagem muito grande (máx. 8 MB). Reduza e tente novamente."); inp.value = ""; return; }
+      const ehImagem = f.type.startsWith("image/");
+      const ehPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+      if (!ehImagem && !ehPdf) {
+        setError(field, "Envie uma imagem (JPG ou PNG) ou um arquivo PDF.");
+        inp.value = ""; return;
+      }
+      if (f.size > 8 * 1024 * 1024) { setError(field, "Arquivo muito grande (máx. 8 MB). Reduza e tente novamente."); inp.value = ""; return; }
       const prev = document.createElement("div");
       prev.className = "file-preview";
-      const url = URL.createObjectURL(f);
-      const img = document.createElement("img");
-      img.src = url; img.alt = "Prévia do comprovante";
       const span = document.createElement("span");
       span.textContent = `${f.name} · ${(f.size / 1048576).toFixed(2)} MB`;
-      prev.append(img, span);
+      if (ehImagem) {
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(f);
+        img.alt = "Prévia do comprovante";
+        prev.append(img, span);
+      } else {
+        const icone = document.createElement("span");
+        icone.className = "file-icone";
+        icone.textContent = "📄";
+        prev.append(icone, span);
+      }
       field.appendChild(prev);
       setValido(field);
     });
@@ -434,8 +446,10 @@ function ativarFormulario(config) {
         try { eu = await window.rbcipAuth.meusDados(); } catch (_) { eu = null; }
       }
       if (eu && (eu.nome || eu.email)) {
-        qpLogado.textContent = "Será registrado que quem preencheu foi você: " +
-          (eu.nome || eu.email) + ".";
+        // Logado: os dados vêm da conta (não precisa digitar nem dá para forjar)
+        qpLogado.innerHTML = "Preenchido por <b>" + escHtml(eu.nome || "—") + "</b>" +
+          (eu.email ? " · " + escHtml(eu.email) : "") +
+          "<br /><small>Registrado automaticamente pela sua conta.</small>";
         qpLogado.hidden = false;
         qpCampos.hidden = true;
       } else {
