@@ -88,6 +88,10 @@ window.rbcipAuth = {
 
 /* ---------- Autofill da Seção 1 ---------- */
 async function rbcipAutofill(form) {
+  // Preenchendo para outra pessoa: os dados da Seção 1 são do terceiro,
+  // então não podem ser sobrescritos pelos dados de quem está logado.
+  const terceiro = document.getElementById("por-terceiro");
+  if (terceiro && terceiro.checked) return;
   const dados = await window.rbcipAuth.meusDados();
   if (!dados) return;
   const campos = ["nome", "email", "cpf", "rg", "orgao_uf", "chave_pix"];

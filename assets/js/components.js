@@ -109,6 +109,34 @@ function campoConfirmacaoPix() {
     </div>`;
 }
 
+/* Bloco de preenchimento por terceiro (ex.: secretaria preenche para um
+   prestador). Fica FORA de .field de propósito: estes campos identificam
+   quem preencheu e não entram nos dados da solicitação nem no recibo. */
+function blocoTerceiro() {
+  return `
+    <div class="terceiro-box">
+      <label class="option">
+        <input type="checkbox" id="por-terceiro" />
+        <span><b>Estou preenchendo para outra pessoa</b><br />
+          <small>Marque se os dados abaixo são de outra pessoa (ex.: um prestador
+          de serviço). A solicitação fica no nome dela, e o seu registro fica
+          guardado como responsável pelo preenchimento.</small></span>
+      </label>
+      <div id="quem-preenche" class="quem-preenche" hidden>
+        <p class="qp-logado" id="qp-logado" hidden></p>
+        <div class="qp-campos" id="qp-campos" hidden>
+          <label>Seu nome <span class="req">*</span>
+            <input type="text" id="qp-nome" autocomplete="name" />
+          </label>
+          <label>Seu e-mail <span class="req">*</span>
+            <input type="email" id="qp-email" autocomplete="email" />
+          </label>
+          <span class="error" id="qp-erro"></span>
+        </div>
+      </div>
+    </div>`;
+}
+
 /* ---------- Seção 1 – Dados do Colaborador ----------
    opts.nome      : "texto" (padrão) ou "select" (base de bolsistas)
    opts.projeto   : true para incluir o campo Projeto de Referência
@@ -132,6 +160,7 @@ function secaoDadosColaborador(opts = {}) {
   return `
     <section class="form-section">
       <h2 class="section-title"><span class="num">1</span>Dados do Colaborador</h2>
+      ${blocoTerceiro()}
       ${campos}
     </section>`;
 }

@@ -397,6 +397,11 @@ function abrirDetalhe(sub) {
     ["Enviado em", fmtData(sub.criado_em)],
     ["Status atual", STATUS_LABEL[sub.status] || sub.status],
   ];
+  if (sub.por_terceiro) {
+    const quem = sub.preenchido_por_nome || sub.preenchido_por_email || "não identificado";
+    const conta = sub.preenchido_por_uid ? " (conta verificada)" : " (informado no formulário)";
+    linhas.push(["Preenchido por", quem + conta]);
+  }
   const dados = sub.dados || {};
   Object.keys(dados).forEach((k) => {
     let v = dados[k];

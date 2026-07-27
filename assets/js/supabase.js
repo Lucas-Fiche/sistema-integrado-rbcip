@@ -61,7 +61,7 @@ window.rbcipReady = (async () => {
       if (error) throw error;
       return data.path;
     },
-    async salvarSubmissao({ formulario, dados }) {
+    async salvarSubmissao({ formulario, dados, por_terceiro, preenchido_por_nome, preenchido_por_email }) {
       const pessoa = extrairPessoa(dados);
       const registro = {
         formulario,
@@ -71,6 +71,11 @@ window.rbcipReady = (async () => {
         projeto: dados["Projeto de Referência"] || null,
         valor: parseValor(dados),
         dados,
+        // Autoria do preenchimento: o vínculo com a conta é resolvido no
+        // servidor (auth.uid()); daqui só vai o declarado quando não há login.
+        por_terceiro: !!por_terceiro,
+        preenchido_por_nome: preenchido_por_nome || null,
+        preenchido_por_email: preenchido_por_email || null,
       };
       // Via função SECURITY DEFINER: insere e DEVOLVE o número do recibo
       // (o RLS não permite ler a tabela submissoes de volta num insert comum).

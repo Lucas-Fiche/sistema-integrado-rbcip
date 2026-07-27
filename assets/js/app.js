@@ -404,11 +404,85 @@ function ativarFormulario(config) {
     box.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  // ---- Preenchimento para outra pessoa (ex.: secretaria por um prestador) ----
+  const chkTerceiro = document.getElementById("por-terceiro");
+  const boxQuem = document.getElementById("quem-preenche");
+  const qpLogado = document.getElementById("qp-logado");
+  const qpCampos = document.getElementById("qp-campos");
+
+  async function configurarTerceiro() {
+    if (!chkTerceiro || !boxQuem) return;
+    chkTerceiro.addEventListener("change", async () => {
+      boxQuem.hidden = !chkTerceiro.checked;
+      if (!chkTerceiro.checked) {
+        // Voltou a preencher para si: restaura os próprios dados
+        if (typeof rbcipAutofill === "function") await rbcipAutofill(form);
+        return;
+      }
+      // Limpa a Seção 1 para receber os dados do terceiro
+      ["nome", "email", "cpf", "rg", "orgao_uf", "chave_pix"].forEach((n) => {
+        const el = form.querySelector(`[name="${n}"]`);
+        if (el && el.tagName !== "SELECT") {
+          el.value = "";
+          clearEstado(el.closest(".field") || el);
+        }
+      });
+      // Quem está preenchendo: com login usamos a conta (não dá para forjar);
+      // sem login (Pagamento é público), a pessoa se identifica.
+      let eu = null;
+      if (window.rbcipAuth && window.rbcipAuth.meusDados) {
+        try { eu = await window.rbcipAuth.meusDados(); } catch (_) { eu = null; }
+      }
+      if (eu && (eu.nome || eu.email)) {
+        qpLogado.textContent = "Será registrado que quem preencheu foi você: " +
+          (eu.nome || eu.email) + ".";
+        qpLogado.hidden = false;
+        qpCampos.hidden = true;
+      } else {
+        qpLogado.hidden = true;
+        qpCampos.hidden = false;
+      }
+    });
+  }
+  configurarTerceiro();
+
+  // Dados de autoria enviados ao banco (o vínculo com a conta é resolvido
+  // no servidor; aqui só vai o que a pessoa declarou quando não há login).
+  function dadosTerceiro() {
+    if (!chkTerceiro || !chkTerceiro.checked) return { por_terceiro: false };
+    const nome = document.getElementById("qp-nome");
+    const email = document.getElementById("qp-email");
+    return {
+      por_terceiro: true,
+      preenchido_por_nome: nome && !qpCampos.hidden ? nome.value.trim() : "",
+      preenchido_por_email: email && !qpCampos.hidden ? email.value.trim() : "",
+    };
+  }
+
+  // Quando não há login, exigir a identificação de quem preencheu
+  function validarTerceiro() {
+    const erro = document.getElementById("qp-erro");
+    if (!chkTerceiro || !chkTerceiro.checked || !qpCampos || qpCampos.hidden) return true;
+    const d = dadosTerceiro();
+    if (!d.preenchido_por_nome || !d.preenchido_por_email) {
+      if (erro) erro.textContent = "Informe seu nome e e-mail para identificar quem preencheu.";
+      boxQuem.scrollIntoView({ behavior: "smooth", block: "center" });
+      return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.preenchido_por_email)) {
+      if (erro) erro.textContent = "Informe um e-mail válido.";
+      return false;
+    }
+    if (erro) erro.textContent = "";
+    return true;
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const erroAntigo = document.getElementById("erro-envio");
     if (erroAntigo) erroAntigo.remove();
     if (!validarFormulario(form)) return;
+    if (!validarTerceiro()) return;
 
     const dados = coletarDados(form);
     const registro = { formulario: config.titulo, formId: config.id, enviadoEm: new Date().toISOString(), dados };
@@ -438,7 +512,9 @@ function ativarFormulario(config) {
             }
           }
         }
-        const res = await window.rbcipDB.salvarSubmissao({ formulario: config.id, dados });
+        const res = await window.rbcipDB.salvarSubmissao({
+          formulario: config.id, dados, ...dadosTerceiro(),
+        });
         if (res && res.reciboNumero != null) registro.recibo = { numero: res.reciboNumero, ano: res.reciboAno };
         salvarLocal(registro);
       } else {
