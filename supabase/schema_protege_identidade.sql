@@ -1,3 +1,8 @@
+-- ⚠️ ARQUIVO SUBSTITUÍDO — NÃO EXECUTE.
+--    Use schema_protege_identidade2.sql. Esta versão ainda PREENCHIA
+--    campos vazios do cadastro com dados de terceiros.
+--    Mantido apenas como histórico. Veja supabase/README.md.
+
 -- =====================================================================
 --  Correção: envio de formulário não pode reescrever a identidade de
 --  alguém já cadastrado.

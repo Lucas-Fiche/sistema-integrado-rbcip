@@ -1,3 +1,8 @@
+-- ℹ️  Este arquivo JÁ contém o contador por formulário (versão atual).
+--    schema_recibo_por_formulario.sql é a MIGRAÇÃO para bancos que foram
+--    criados com a versão antiga (contador global por ano) — em projeto
+--    novo ele não é necessário. Veja supabase/README.md.
+
 -- =====================================================================
 --  Fase 5 — Geração de recibo + envio ao financeiro
 --  Execute no SQL Editor depois dos schemas anteriores.

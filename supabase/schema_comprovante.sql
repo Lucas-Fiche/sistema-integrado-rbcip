@@ -1,3 +1,8 @@
+-- ⚠️ ATENÇÃO: a função fn_registrar_submissao deste arquivo foi
+--    SUBSTITUÍDA por schema_terceiros.sql (que também grava quem
+--    preencheu). Se rodar este arquivo, rode schema_terceiros.sql
+--    em seguida. Veja supabase/README.md.
+
 -- =====================================================================
 --  Fase 6 — Número real do recibo no comprovante do solicitante
 --  Execute no SQL Editor depois dos schemas anteriores.

@@ -1,3 +1,9 @@
+-- ⚠️ ATENÇÃO: a trigger fn_registrar_pessoa deste arquivo foi
+--    SUBSTITUÍDA por schema_protege_identidade2.sql. Reexecutar este
+--    arquivo REABRE a falha que deixava um formulário sobrescrever o
+--    cadastro de outra pessoa — rode schema_protege_identidade2.sql
+--    logo em seguida. Veja supabase/README.md.
+
 -- =====================================================================
 --  Sistema de Solicitações - RBCIP — Schema do banco (Supabase / PostgreSQL)
 --  Fase 1: cadastro de pessoas, projetos e submissões dos formulários.
