@@ -297,7 +297,8 @@ table.subs tr.clicavel:hover { background: var(--brand-light); }
   .admin-top { gap: 10px; margin-bottom: 16px; }
   .dash-nav { width: 100%; }
   .dash-nav a { flex: 1; text-align: center; padding: 9px 10px; }
-  .admin-user { width: 100%; justify-content: space-between; }
+  .admin-user { width: 100%; justify-content: space-between; flex-wrap: wrap; }
+  .link-formularios { padding: 6px 10px; font-size: 0.85rem; }
 
   /* Abas: grade 2x2 — as 4 cabem na tela, sem corte e sem rolagem lateral */
   .tabs {
@@ -372,3 +373,18 @@ table.subs tr.clicavel:hover { background: var(--brand-light); }
   .grafico { padding: 14px 15px; }
   .barra-row { grid-template-columns: 84px 1fr auto; gap: 8px; font-size: 0.78rem; }
 }
+
+/* Atalho para a página de formulários, na barra do usuário */
+.link-formularios {
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--brand);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 6px 12px;
+  white-space: nowrap;
+  transition: border-color .15s ease, background .15s ease;
+}
+.link-formularios:hover { border-color: var(--brand); background: var(--brand-light); }
