@@ -526,3 +526,19 @@ textarea { min-height: 96px; resize: vertical; }
 
 /* Prévia de comprovante em PDF (sem miniatura de imagem) */
 .file-preview .file-icone { font-size: 1.6rem; line-height: 1; }
+
+/* Acesso discreto ao painel, no rodapé da página inicial */
+.link-restrito {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+  opacity: 0.75;
+  transition: color .15s ease, opacity .15s ease;
+}
+.link-restrito:hover {
+  color: var(--brand);
+  opacity: 1;
+  text-decoration: underline;
+}
