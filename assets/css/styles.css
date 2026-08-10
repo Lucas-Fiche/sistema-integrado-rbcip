@@ -3,23 +3,34 @@
    Estilo compartilhado (landing + formulários)
    ============================================================= */
 
+/* Tokens do padrão RBCIP (Design System — Padrão de Cabeçalho).
+   Os nomes internos (--brand, --gold…) são mantidos para não quebrar o
+   restante do CSS; os VALORES seguem a paleta oficial. */
 :root {
-  --brand:        #17324d;  /* navy institucional */
-  --brand-dark:   #0f2438;
-  --brand-light:  #eef2f7;
-  --gold:         #c19a3e;  /* fio de destaque */
-  --accent:       #12805c;  /* verde (sucesso) */
-  --danger:       #b42318;
-  --bg:           #f3f4f6;
+  /* Cores da marca */
+  --cor-primaria:        #004e6b;  /* azul-petróleo RBCIP */
+  --cor-primaria-escura: #003a50;
+  --cor-primaria-clara:  #e6eff3;
+  --cor-secundaria:      #308ead;  /* azul claro */
+  --cor-roxo:            #2f166e;  /* fim do gradiente da marca */
+
+  /* Aliases usados pelo restante do sistema */
+  --brand:        var(--cor-primaria);
+  --brand-dark:   var(--cor-primaria-escura);
+  --brand-light:  var(--cor-primaria-clara);
+  --gold:         var(--cor-secundaria); /* fio de destaque dos cartões */
+  --accent:       #188038;  /* sucesso */
+  --danger:       #d93025;  /* erro */
+  --bg:           #eef2f5;
   --surface:      #ffffff;
-  --text:         #16202e;
-  --muted:        #667085;
-  --border:       #e4e7ec;
+  --text:         #1c2530;
+  --muted:        #5c6b78;
+  --border:       #d5dee3;
   --radius:       10px;
   --radius-sm:    8px;
-  --shadow:       0 1px 3px rgba(16, 24, 40, 0.07), 0 1px 2px rgba(16, 24, 40, 0.04);
-  --shadow-sm:    0 1px 2px rgba(16, 24, 40, 0.05);
-  --font:         -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --shadow:       0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.06);
+  --font:         "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --serif:        Georgia, "Times New Roman", serif;
   --maxw:         760px;
 }
@@ -40,48 +51,54 @@ body {
 
 a { color: var(--brand); }
 
-/* ---------- Cabeçalho ---------- */
-.site-header {
-  background: var(--brand);
-  color: #fff;
-  padding: 26px 24px 24px;
-  border-bottom: 3px solid var(--gold);
-  text-align: center;
-}
-.site-header .brand {
-  font-family: var(--serif);
-  font-size: 0.82rem;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
-  margin: 0 0 5px;
-  font-weight: 400;
-}
-.site-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.site-header p {
-  margin: 7px auto 0;
-  max-width: 620px;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 0.94rem;
-}
-.site-header .header-inner {
+/* ---------- Barra de marca (padrão RBCIP) ----------
+   Largura total, gradiente da marca sempre 90deg, nunca invertido. */
+.brand-bar {
+  background: linear-gradient(90deg, var(--cor-primaria) 0%, var(--cor-roxo) 100%);
+  padding: 18px 32px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 14px;
+  min-height: 96px;
 }
-.site-header .site-logo {
-  flex: none;
-  height: 62px;
-  width: auto;
-  display: block;
+.brand-bar--centro { justify-content: center; }
+.brand-bar__logo { height: 60px; width: auto; display: block; }
+
+/* Fallback textual — só aparece se a logo falhar */
+.brand-bar__texto {
+  display: none;
+  align-items: baseline;
+  gap: 8px;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 2px;
 }
-.site-header .header-text { min-width: 0; }
+.brand-bar__texto small {
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 1px;
+  opacity: .85;
+  text-transform: lowercase;
+}
+
+/* ---------- Cabeçalho de página: título + ações ---------- */
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.page-head__titulo { margin: 0; font-size: 26px; letter-spacing: -.2px; }
+.page-head__sub { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+
+@media (max-width: 640px) {
+  .brand-bar { padding: 16px 20px; min-height: 84px; }
+  .brand-bar__logo { height: 48px; }
+  .page-head { flex-direction: column; align-items: stretch; gap: 10px; }
+  .page-head__titulo { font-size: 22px; }
+}
 
 /* ---------- Container ---------- */
 .container {
@@ -167,9 +184,9 @@ a { color: var(--brand); }
 }
 .form-card h1 {
   margin: 0 0 4px;
-  font-size: 1.4rem;
+  font-size: 26px;          /* título de página — padrão RBCIP */
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -.2px;
 }
 .form-intro {
   color: var(--muted);

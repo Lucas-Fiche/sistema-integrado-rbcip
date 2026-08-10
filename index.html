@@ -7,17 +7,22 @@
   <link rel="stylesheet" href="assets/css/styles.css" />
 </head>
 <body>
-  <header class="site-header">
-    <div class="header-inner">
-      <img src="assets/img/logo.png" alt="RBCIP — pesquisa e inovação" class="site-logo" onerror="this.style.display='none'" />
-      <div class="header-text">
-        <h1>Formulários Institucionais</h1>
-        <p>Selecione abaixo o formulário que deseja acessar.</p>
-      </div>
-    </div>
+  <header class="brand-bar brand-bar--centro">
+    <img class="brand-bar__logo" src="assets/img/logo.png"
+         alt="RBCIP — pesquisa e inovação"
+         onerror="this.style.display='none';
+                  this.parentNode.querySelector('.brand-bar__texto').style.display='inline-flex';" />
+    <span class="brand-bar__texto">RBCIP <small>pesquisa e inovação</small></span>
   </header>
 
   <main class="container">
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__titulo">Formulários Institucionais</h1>
+        <p class="page-head__sub">Selecione abaixo o formulário que deseja acessar.</p>
+      </div>
+    </div>
+
     <div class="cards">
       <a class="card" href="forms/pagamentos.html">
         <div class="icon">💳</div>
@@ -50,7 +55,7 @@
   </main>
 
   <footer class="site-footer">
-    Sistema de Solicitações - RBCIP · v1.2
+    Sistema de Solicitações - RBCIP · v1.3
     <a class="link-restrito" href="admin/acompanhamento.html">Acessar o Dashboard (área restrita)</a>
   </footer>
 </body>

@@ -7,13 +7,12 @@
   <link rel="stylesheet" href="../assets/css/styles.css" />
 </head>
 <body>
-  <header class="site-header">
-    <div class="header-inner">
-      <img src="../assets/img/logo.png" alt="RBCIP — pesquisa e inovação" class="site-logo" onerror="this.style.display='none'" />
-      <div class="header-text">
-        <h1>Formulário de Pagamento</h1>
-      </div>
-    </div>
+  <header class="brand-bar brand-bar--centro">
+    <img class="brand-bar__logo" src="../assets/img/logo.png"
+         alt="RBCIP — pesquisa e inovação"
+         onerror="this.style.display='none';
+                  this.parentNode.querySelector('.brand-bar__texto').style.display='inline-flex';" />
+    <span class="brand-bar__texto">RBCIP <small>pesquisa e inovação</small></span>
   </header>
 
   <nav class="topbar">
@@ -68,7 +67,7 @@
     </div>
   </main>
 
-  <footer class="site-footer">Sistema de Solicitações - RBCIP · v1.2</footer>
+  <footer class="site-footer">Sistema de Solicitações - RBCIP · v1.3</footer>
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/data.js"></script>

@@ -8,13 +8,12 @@
   <link rel="stylesheet" href="../assets/css/admin.css" />
 </head>
 <body>
-  <header class="site-header">
-    <div class="header-inner">
-      <img src="../assets/img/logo.png" alt="RBCIP — pesquisa e inovação" class="site-logo" onerror="this.style.display='none'" />
-      <div class="header-text">
-        <h1>Dashboard de Gestão</h1>
-      </div>
-    </div>
+  <header class="brand-bar brand-bar--centro">
+    <img class="brand-bar__logo" src="../assets/img/logo.png"
+         alt="RBCIP — pesquisa e inovação"
+         onerror="this.style.display='none';
+                  this.parentNode.querySelector('.brand-bar__texto').style.display='inline-flex';" />
+    <span class="brand-bar__texto">RBCIP <small>pesquisa e inovação</small></span>
   </header>
 
   <!-- Área de login / acesso -->
@@ -22,16 +21,23 @@
 
   <!-- Dashboard (revelado após login de staff) -->
   <main class="admin-wrap" id="area-dashboard" hidden>
-    <div class="admin-top">
-      <nav class="dash-nav">
-        <a href="index.html" class="ativo">🗂️ Gestão</a>
-        <a href="acompanhamento.html">📊 Acompanhamento</a>
-      </nav>
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__titulo">Dashboard de Gestão</h1>
+        <p class="page-head__sub">Sistema de Solicitações - RBCIP</p>
+      </div>
       <div class="admin-user">
         <span id="quem"></span>
         <a class="link-formularios" href="../index.html" target="_blank" rel="noopener" title="Abre em uma nova aba">📝 Formulários</a>
         <button type="button" class="link-sair" id="btn-sair">Sair</button>
       </div>
+    </div>
+
+    <div class="admin-top">
+      <nav class="dash-nav">
+        <a href="index.html" class="ativo">🗂️ Gestão</a>
+        <a href="acompanhamento.html">📊 Acompanhamento</a>
+      </nav>
     </div>
 
     <div class="tabs" id="tabs"></div>
@@ -96,7 +102,7 @@
     </div>
   </div>
 
-  <footer class="site-footer">Sistema de Solicitações - RBCIP · v1.2</footer>
+  <footer class="site-footer">Sistema de Solicitações - RBCIP · v1.3</footer>
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/supabase.js"></script>
