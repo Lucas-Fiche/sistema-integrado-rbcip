@@ -141,6 +141,25 @@ const SIGLAS: Record<string, string> = {
 const codigoRecibo = (rec: any) =>
   (SIGLAS[rec.formulario] || "REC") + "-" + (rec.recibo_numero ?? "") + "/" + (rec.recibo_ano ?? "");
 
+/* Trecho seguro para nome de arquivo: sem acentos, espaços ou símbolos, para
+   não quebrar em anexos de e-mail nem em sistemas de arquivos. */
+function paraNomeArquivo(s: string, limite = 60): string {
+  return String(s || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, limite)
+    .replace(/-+$/, "");
+}
+
+/* Nome do arquivo do recibo: código + nome do beneficiário.
+   Ex.: REE-33-2026-Lucas-Fiche-Ungarelli-Borges.pdf */
+function nomeArquivoRecibo(rec: any): string {
+  const codigo = paraNomeArquivo(codigoRecibo(rec), 24);
+  const pessoa = paraNomeArquivo(rec.nome || rec.dados?.["Nome Completo"] || "");
+  return "recibo-" + codigo + (pessoa ? "-" + pessoa : "") + ".pdf";
+}
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -263,7 +282,7 @@ Deno.serve(async (req) => {
     const copyResp = await fetch(`https://www.googleapis.com/drive/v3/files/${templateId}/copy?supportsAllDrives=true`, {
       method: "POST",
       headers: { Authorization: `Bearer ${gtoken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ name: `recibo-${record.formulario}-${record.recibo_numero}-${record.recibo_ano}`, parents: folderId ? [folderId] : undefined }),
+      body: JSON.stringify({ name: nomeArquivoRecibo(record).replace(/\.pdf$/, ""), parents: folderId ? [folderId] : undefined }),
     });
     if (!copyResp.ok) throw new Error("Drive copy: " + await copyResp.text());
     docId = (await copyResp.json()).id;
@@ -385,7 +404,7 @@ Deno.serve(async (req) => {
     // Guarda o PDF (já com o comprovante) no Storage para o dashboard exibir
     const reciboPath = `${record.id}-${record.recibo_ano}-${record.recibo_numero}.pdf`;
     await db.storage.from("recibos").upload(reciboPath, pdfBytes, { contentType: "application/pdf", upsert: true });
-    const nomeArq = `recibo-${record.formulario}-${record.recibo_numero}-${record.recibo_ano}.pdf`;
+    const nomeArq = nomeArquivoRecibo(record);
     const anexos: Record<string, unknown>[] = [{ filename: nomeArq, content: pdfB64, encoding: "base64", contentType: "application/pdf" }];
 
     // 5. Envia por e-mail
