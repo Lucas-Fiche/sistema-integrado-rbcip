@@ -522,8 +522,16 @@ function ativarFormulario(config) {
             if (inp.files && inp.files[0]) {
               const campo = inp.closest(".field");
               const label = (campo && campo.dataset.label) || "Anexo";
-              try { dados[label] = await window.rbcipDB.uploadArquivo(inp.files[0]); }
-              catch (e) { console.error("upload do anexo falhou:", e); }
+              // Falha no anexo NÃO pode passar batido: antes o envio seguia com
+              // o nome do arquivo no lugar do caminho, e o comprovante sumia.
+              try {
+                dados[label] = await window.rbcipDB.uploadArquivo(inp.files[0]);
+              } catch (e) {
+                console.error("upload do anexo falhou:", e);
+                if (campo) setError(campo, "Não foi possível enviar este arquivo. Tente novamente.");
+                const det = [e && e.message, e && e.error, e && e.statusCode].filter(Boolean).join(" · ");
+                throw new Error("Falha ao enviar o anexo \"" + inp.files[0].name + "\"" + (det ? " (" + det + ")" : ""));
+              }
             }
           }
         }

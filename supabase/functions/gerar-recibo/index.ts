@@ -108,6 +108,19 @@ function acharIndice(doc: any, marcador: string): number | null {
   return busca(doc.body?.content);
 }
 
+/* ---------- Anexa a imagem do comprovante como página do recibo ----------
+   Rede de segurança: usada quando a inserção no modelo não foi possível. */
+async function anexarImagemComoPagina(reciboPdf: Uint8Array, img: Uint8Array): Promise<Uint8Array> {
+  const doc = await PDFDocument.load(reciboPdf);
+  const emb = ehPngBytes(img) ? await doc.embedPng(img) : await doc.embedJpg(img);
+  const A4_L = 595.28, A4_A = 841.89, margem = 36;
+  const pagina = doc.addPage([A4_L, A4_A]);
+  const escala = Math.min((A4_L - margem * 2) / emb.width, (A4_A - margem * 2) / emb.height, 1);
+  const l = emb.width * escala, a = emb.height * escala;
+  pagina.drawImage(emb, { x: (A4_L - l) / 2, y: (A4_A - a) / 2, width: l, height: a });
+  return await doc.save();
+}
+
 /* ---------- Anexa um comprovante em PDF como páginas do recibo ----------
    Usado só quando o comprovante é PDF (imagens vão dentro do modelo). */
 async function anexarPdf(reciboPdf: Uint8Array, anexoPdf: Uint8Array): Promise<Uint8Array> {
@@ -294,7 +307,11 @@ Deno.serve(async (req) => {
     });
     if (!upd.ok) throw new Error("Docs batchUpdate: " + await upd.text());
 
-    // 4. Insere a imagem do comprovante no lugar do marcador
+    // 4. Insere a imagem do comprovante no lugar do marcador.
+    //    Se falhar (marcador ausente no modelo, Google sem acessar a URL…),
+    //    imagemPendente segue true e a imagem é anexada como página no fim —
+    //    o comprovante nunca pode se perder por causa do modelo.
+    let imagemPendente = compEhImagem && !!compBytes;
     if (compEhImagem && compBytes) {
       try {
         const { data: assinada } = await db.storage
@@ -330,9 +347,10 @@ Deno.serve(async (req) => {
           }),
         });
         if (!ins.ok) throw new Error("insertInlineImage: " + await ins.text());
+        imagemPendente = false; // entrou no modelo, não precisa de página extra
       } catch (e) {
-        // Falha ao embutir não pode impedir o envio do recibo
-        console.error("inserir comprovante no documento falhou:", e);
+        // Falha ao embutir não impede o envio: cai no anexo em página própria
+        console.error("inserir comprovante no documento falhou (usando página extra):", e);
       }
     }
 
@@ -349,6 +367,17 @@ Deno.serve(async (req) => {
         pdfBytes = await anexarPdf(pdfBytes, compBytes);
       } catch (e) {
         console.error("anexar PDF do comprovante falhou:", e);
+      }
+    }
+
+    // 6b. Rede de segurança: a imagem não entrou no modelo, então vai como
+    //     página própria. Melhor uma página extra do que um recibo sem
+    //     comprovante.
+    if (imagemPendente && compBytes) {
+      try {
+        pdfBytes = await anexarImagemComoPagina(pdfBytes, compBytes);
+      } catch (e) {
+        console.error("anexar imagem como página falhou:", e);
       }
     }
     const pdfB64 = toBase64(pdfBytes);

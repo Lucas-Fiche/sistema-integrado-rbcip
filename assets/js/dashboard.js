@@ -406,6 +406,14 @@ function abrirDetalhe(sub) {
   Object.keys(dados).forEach((k) => {
     let v = dados[k];
     if (Array.isArray(v)) v = v.join(", ");
+    // Anexo: vira link para abrir o arquivo. Quando o valor é só o nome do
+    // arquivo (sem caminho no Storage), o upload falhou e não há o que abrir.
+    if (/anexar|comprovante|anexo/i.test(k) && typeof v === "string" && v) {
+      linhas.push([k, ehCaminhoStorage(v)
+        ? `<button type="button" class="link-anexo" data-anexo="${esc(v)}">📎 ${esc(nomeArquivo(v))}</button>`
+        : `<span class="anexo-ausente">⚠️ ${esc(v)} — arquivo não chegou ao sistema</span>`, true]);
+      return;
+    }
     linhas.push([k, v]);
   });
 
@@ -413,11 +421,14 @@ function abrirDetalhe(sub) {
     ? `<button type="button" class="btn btn-secondary" id="ver-recibo" style="margin-bottom:16px">📄 Ver recibo (PDF)</button>`
     : `<p class="vazio-min" style="margin-bottom:16px">Recibo ainda não disponível para esta solicitação.</p>`;
   body.innerHTML = recibo + linhas
-    .map(([k, v]) => `<div class="det-linha"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`)
+    .map(([k, v, html]) => `<div class="det-linha"><div class="k">${esc(k)}</div><div class="v">${html ? v : esc(v)}</div></div>`)
     .join("") +
     '<div id="historico"><p class="vazio-min" style="margin-top:16px">Carregando histórico…</p></div>';
   const btnRecibo = document.getElementById("ver-recibo");
   if (btnRecibo) btnRecibo.onclick = () => verRecibo(sub.recibo_path, btnRecibo);
+  body.querySelectorAll(".link-anexo").forEach((b) => {
+    b.onclick = () => verAnexo(b.dataset.anexo, b);
+  });
   renderHistorico(sub.id);
 
   // Botões de status
@@ -464,6 +475,26 @@ async function renderHistorico(submissaoId) {
       '<span class="hist-meta">por <b>' + esc(autor) + "</b> · " + fmtData(h.criado_em) + "</span>" +
       "</li>";
   }).join("") + "</ul>";
+}
+
+// O upload nomeia o arquivo como "<timestamp>-<nome>"; quando o envio falha,
+// sobra apenas o nome original (com espaços, sem o prefixo numérico).
+const ehCaminhoStorage = (v) => /^\d{10,}-/.test(v) && !/\s/.test(v);
+const nomeArquivo = (v) => String(v).replace(/^\d{10,}-/, "");
+
+// Abre o comprovante anexado (URL assinada temporária; só staff, via RLS)
+async function verAnexo(caminho, btn) {
+  const txt = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "Abrindo…"; }
+  const { data, error } = await supa.storage.from("comprovantes").createSignedUrl(caminho, 120);
+  if (btn) { btn.disabled = false; btn.textContent = txt; }
+  if (error || !data) {
+    console.error("verAnexo:", error);
+    alert("Não foi possível abrir o comprovante.\n\n" +
+      "Se o erro persistir, confirme que o schema_ver_comprovante.sql foi executado no Supabase.");
+    return;
+  }
+  window.open(data.signedUrl, "_blank");
 }
 
 // Abre o PDF do recibo (URL assinada temporária; acesso só de staff via RLS)
