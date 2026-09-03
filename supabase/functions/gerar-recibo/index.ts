@@ -16,7 +16,18 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
-import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
+
+// pdf-lib é uma biblioteca grande: só de CARREGAR e interpretar o módulo já se
+// gasta CPU, e isso acontecia em TODA invocação, mesmo nas que não usam PDF
+// (pagamentos e diárias nunca precisam dela). Import sob demanda.
+let _PDFDocument: any = null;
+async function carregarPdfLib() {
+  if (!_PDFDocument) {
+    const m = await import("https://esm.sh/pdf-lib@1.17.1");
+    _PDFDocument = m.PDFDocument;
+  }
+  return _PDFDocument;
+}
 
 /* ---------- Valor por extenso ---------- */
 const UNI = ["zero","um","dois","três","quatro","cinco","seis","sete","oito","nove","dez","onze","doze","treze","quatorze","quinze","dezesseis","dezessete","dezoito","dezenove"];
@@ -110,6 +121,7 @@ function acharIndice(doc: any, marcador: string): number | null {
 /* ---------- Anexa a imagem do comprovante como página do recibo ----------
    Rede de segurança: usada quando a inserção no modelo não foi possível. */
 async function anexarImagemComoPagina(reciboPdf: Uint8Array, img: Uint8Array): Promise<Uint8Array> {
+  const PDFDocument = await carregarPdfLib();
   const doc = await PDFDocument.load(reciboPdf);
   const emb = ehPngBytes(img) ? await doc.embedPng(img) : await doc.embedJpg(img);
   const A4_L = 595.28, A4_A = 841.89, margem = 36;
@@ -133,6 +145,7 @@ const LIMITE_UNIR_PDF = 1_500_000;
 /* ---------- Anexa um comprovante em PDF como páginas do recibo ----------
    Usado só quando o comprovante é PDF (imagens vão dentro do modelo). */
 async function anexarPdf(reciboPdf: Uint8Array, anexoPdf: Uint8Array): Promise<Uint8Array> {
+  const PDFDocument = await carregarPdfLib();
   const doc = await PDFDocument.load(reciboPdf);
   const anexo = await PDFDocument.load(anexoPdf);
   const paginas = await doc.copyPages(anexo, anexo.getPageIndices());
@@ -280,6 +293,10 @@ Deno.serve(async (req) => {
   // sem isso, um erro deixava a solicitação sem qualquer indicação do motivo.
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   let idAtual: number | null = null;
+  // Cronômetro por etapa: sem isso não dá para saber ONDE os 12 segundos são
+  // gastos quando a função é morta por WORKER_RESOURCE_LIMIT.
+  const t0 = Date.now();
+  const marco = (etapa: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(2)}s] ${etapa}`);
   try {
     const { token, record } = await req.json();
     if (token !== Deno.env.get("RECIBO_TOKEN")) return json({ ok: false, erro: "token_invalido" }, 401);
@@ -290,6 +307,7 @@ Deno.serve(async (req) => {
     if (!templateId) return json({ ok: false, erro: "template_nao_configurado: " + record.formulario }, 400);
 
     gtoken = await tokenGoogle();
+    marco("token Google obtido");
     const folderId = Deno.env.get("DRIVE_FOLDER_ID");
 
     // 1. Copia o modelo (supportsAllDrives: necessário para Drives Compartilhados)
@@ -300,6 +318,7 @@ Deno.serve(async (req) => {
     });
     if (!copyResp.ok) throw new Error("Drive copy: " + await copyResp.text());
     docId = (await copyResp.json()).id;
+    marco("modelo copiado no Drive");
 
 
     // 2. Reembolso: baixa o comprovante antes, para saber se é imagem ou PDF
@@ -319,6 +338,7 @@ Deno.serve(async (req) => {
     }
     const compEhImagem = !!compBytes && !ehPdfBytes(compBytes) &&
       (ehPngBytes(compBytes) || ehJpgBytes(compBytes));
+    if (compBytes) marco(`comprovante baixado (${(compBytes.length / 1048576).toFixed(2)} MB, ${compEhImagem ? "imagem" : "PDF"})`);
 
     // 3. Substitui os campos. Para imagem, o placeholder do modelo recebe um
     //    marcador — a imagem entra ali (página reservada no modelo), evitando
@@ -338,6 +358,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ requests }),
     });
     if (!upd.ok) throw new Error("Docs batchUpdate: " + await upd.text());
+    marco("campos substituídos");
 
     // 4. Insere a imagem do comprovante no lugar do marcador.
     //    Se falhar (marcador ausente no modelo, Google sem acessar a URL…),
@@ -380,6 +401,7 @@ Deno.serve(async (req) => {
         });
         if (!ins.ok) throw new Error("insertInlineImage: " + await ins.text());
         imagemPendente = false; // entrou no modelo, não precisa de página extra
+        marco("imagem inserida no modelo");
       } catch (e) {
         // Falha ao embutir não impede o envio: cai no anexo em página própria
         console.error("inserir comprovante no documento falhou (usando página extra):", e);
@@ -392,6 +414,7 @@ Deno.serve(async (req) => {
     });
     if (!exp.ok) throw new Error("Drive export: " + await exp.text());
     let pdfBytes = new Uint8Array(await exp.arrayBuffer());
+    marco(`PDF exportado (${(pdfBytes.length / 1048576).toFixed(2)} MB)`);
 
     // 6. Comprovante em PDF: entra como páginas seguintes do mesmo arquivo.
     //    Acima do limite, unir custa CPU demais (a função é morta antes de
@@ -425,6 +448,7 @@ Deno.serve(async (req) => {
     // Guarda o PDF (já com o comprovante) no Storage para o dashboard exibir
     const reciboPath = `${record.id}-${record.recibo_ano}-${record.recibo_numero}.pdf`;
     await db.storage.from("recibos").upload(reciboPath, pdfBytes, { contentType: "application/pdf", upsert: true });
+    marco("PDF salvo no Storage");
     const nomeArq = nomeArquivoRecibo(record);
     // encoding "binary": entrega os bytes ao denomailer sem passar por base64
     // em JS — foi o que estourava o limite de CPU.
@@ -445,6 +469,7 @@ Deno.serve(async (req) => {
     // 5. Envia por e-mail
     const destinatarios = (Deno.env.get("RECIBO_DESTINATARIOS") || "").split(",").map((s) => s.trim()).filter(Boolean);
     if (!destinatarios.length) throw new Error("RECIBO_DESTINATARIOS vazio");
+    marco("conectando ao SMTP");
     const client = new SMTPClient({
       connection: { hostname: "smtp.gmail.com", port: 465, tls: true, auth: { username: Deno.env.get("GMAIL_USER")!, password: Deno.env.get("GMAIL_APP_PASSWORD")! } },
     });
@@ -494,6 +519,7 @@ Deno.serve(async (req) => {
       attachments: anexos as any,
     });
     await client.close();
+    marco("e-mail enviado");
 
     // 6. Limpa a cópia e marca como enviado
     await fetch(`https://www.googleapis.com/drive/v3/files/${docId}?supportsAllDrives=true`, { method: "DELETE", headers: { Authorization: `Bearer ${gtoken}` } });
