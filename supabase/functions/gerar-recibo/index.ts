@@ -45,11 +45,10 @@ const val = (d: Record<string, unknown>, k: string) => {
   if (Array.isArray(x)) return x.join(", ");
   return x == null || x === "" ? "" : String(x);
 };
-function toBase64(bytes: Uint8Array): string {
-  let bin = ""; const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  return btoa(bin);
-}
+// Observação: NÃO converta o PDF para base64 aqui. Isso já custou o limite de
+// CPU da Edge Function ("CPU Time exceeded", status 546): montar uma string de
+// vários MB com String.fromCharCode(...) é caro demais. O denomailer aceita os
+// bytes direto (encoding: "binary") e faz a codificação internamente.
 
 /* ---------- Tipo e dimensões do comprovante ---------- */
 const ehPdfBytes = (b: Uint8Array) => b[0] === 0x25 && b[1] === 0x50; // "%P"
@@ -399,13 +398,16 @@ Deno.serve(async (req) => {
         console.error("anexar imagem como página falhou:", e);
       }
     }
-    const pdfB64 = toBase64(pdfBytes);
-
     // Guarda o PDF (já com o comprovante) no Storage para o dashboard exibir
     const reciboPath = `${record.id}-${record.recibo_ano}-${record.recibo_numero}.pdf`;
     await db.storage.from("recibos").upload(reciboPath, pdfBytes, { contentType: "application/pdf", upsert: true });
     const nomeArq = nomeArquivoRecibo(record);
-    const anexos: Record<string, unknown>[] = [{ filename: nomeArq, content: pdfB64, encoding: "base64", contentType: "application/pdf" }];
+    // encoding "binary": entrega os bytes ao denomailer sem passar por base64
+    // em JS — foi o que estourava o limite de CPU.
+    const anexos: Record<string, unknown>[] = [
+      { filename: nomeArq, content: pdfBytes, encoding: "binary", contentType: "application/pdf" },
+    ];
+    console.log(`PDF pronto: ${(pdfBytes.length / 1048576).toFixed(2)} MB — ${nomeArq}`);
 
     // 5. Envia por e-mail
     const destinatarios = (Deno.env.get("RECIBO_DESTINATARIOS") || "").split(",").map((s) => s.trim()).filter(Boolean);
