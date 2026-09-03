@@ -270,7 +270,19 @@ function ativarFormulario(config) {
         setError(field, "Envie uma imagem (JPG ou PNG) ou um arquivo PDF.");
         inp.value = ""; return;
       }
-      if (f.size > 8 * 1024 * 1024) { setError(field, "Arquivo muito grande (máx. 8 MB). Reduza e tente novamente."); inp.value = ""; return; }
+      // Imagens são reduzidas automaticamente logo abaixo; PDF não dá para
+      // comprimir aqui. Scanners costumam gerar PDF sem compressão — uma
+      // única página vira 8 MB. Nesse caso, fotografar resolve na hora.
+      if (f.size > 8 * 1024 * 1024) {
+        setError(field, ehPdf
+          ? `Este PDF tem ${(f.size / 1048576).toFixed(1)} MB e passa do limite de 8 MB. ` +
+            "PDFs de digitalização costumam ficar grandes assim. " +
+            "O mais rápido é tirar uma FOTO do documento e enviar a foto — " +
+            "o sistema reduz o tamanho sozinho, sem perder legibilidade."
+          : `Este arquivo tem ${(f.size / 1048576).toFixed(1)} MB e passa do limite de 8 MB.`);
+        inp.value = "";
+        return;
+      }
 
       const prev = document.createElement("div");
       prev.className = "file-preview";
