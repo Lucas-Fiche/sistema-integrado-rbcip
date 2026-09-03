@@ -117,8 +117,18 @@ async function anexarImagemComoPagina(reciboPdf: Uint8Array, img: Uint8Array): P
   const escala = Math.min((A4_L - margem * 2) / emb.width, (A4_A - margem * 2) / emb.height, 1);
   const l = emb.width * escala, a = emb.height * escala;
   pagina.drawImage(emb, { x: (A4_L - l) / 2, y: (A4_A - a) / 2, width: l, height: a });
-  return await doc.save();
+  return await doc.save(SAVE_RAPIDO);
 }
+
+/* useObjectStreams:false pula a compressão em object streams no save() — é a
+   etapa mais cara do pdf-lib. O arquivo fica um pouco maior, mas gasta bem
+   menos CPU, que é o recurso escasso aqui. */
+const SAVE_RAPIDO = { useObjectStreams: false } as const;
+
+/* Acima deste tamanho, unir o PDF custa CPU demais e a função é morta antes de
+   enviar. Nesses casos o comprovante vai como anexo separado: um e-mail com
+   dois arquivos é melhor do que nenhum e-mail. */
+const LIMITE_UNIR_PDF = 1_500_000;
 
 /* ---------- Anexa um comprovante em PDF como páginas do recibo ----------
    Usado só quando o comprovante é PDF (imagens vão dentro do modelo). */
@@ -127,7 +137,7 @@ async function anexarPdf(reciboPdf: Uint8Array, anexoPdf: Uint8Array): Promise<U
   const anexo = await PDFDocument.load(anexoPdf);
   const paginas = await doc.copyPages(anexo, anexo.getPageIndices());
   paginas.forEach((p) => doc.addPage(p));
-  return await doc.save();
+  return await doc.save(SAVE_RAPIDO);
 }
 
 /* Sigla por formulário: torna o número do recibo único entre formulários */
@@ -383,12 +393,22 @@ Deno.serve(async (req) => {
     if (!exp.ok) throw new Error("Drive export: " + await exp.text());
     let pdfBytes = new Uint8Array(await exp.arrayBuffer());
 
-    // 6. Comprovante em PDF: entra como páginas seguintes do mesmo arquivo
+    // 6. Comprovante em PDF: entra como páginas seguintes do mesmo arquivo.
+    //    Acima do limite, unir custa CPU demais (a função é morta antes de
+    //    enviar), então segue como anexo separado.
+    let anexoSeparado: { nome: string; bytes: Uint8Array } | null = null;
     if (compBytes && !compEhImagem && ehPdfBytes(compBytes)) {
-      try {
-        pdfBytes = await anexarPdf(pdfBytes, compBytes);
-      } catch (e) {
-        console.error("anexar PDF do comprovante falhou:", e);
+      if (compBytes.length > LIMITE_UNIR_PDF) {
+        console.log(`comprovante PDF de ${(compBytes.length / 1048576).toFixed(2)} MB: ` +
+          "grande demais para unir, seguindo como anexo separado");
+        anexoSeparado = { nome: compCaminho.split("/").pop() || "comprovante.pdf", bytes: compBytes };
+      } else {
+        try {
+          pdfBytes = await anexarPdf(pdfBytes, compBytes);
+        } catch (e) {
+          console.error("anexar PDF do comprovante falhou, seguindo separado:", e);
+          anexoSeparado = { nome: compCaminho.split("/").pop() || "comprovante.pdf", bytes: compBytes };
+        }
       }
     }
 
@@ -411,7 +431,16 @@ Deno.serve(async (req) => {
     const anexos: Record<string, unknown>[] = [
       { filename: nomeArq, content: pdfBytes, encoding: "binary", contentType: "application/pdf" },
     ];
-    console.log(`PDF pronto: ${(pdfBytes.length / 1048576).toFixed(2)} MB — ${nomeArq}`);
+    if (anexoSeparado) {
+      anexos.push({
+        filename: anexoSeparado.nome,
+        content: anexoSeparado.bytes,
+        encoding: "binary",
+        contentType: "application/pdf",
+      });
+    }
+    console.log(`PDF pronto: ${(pdfBytes.length / 1048576).toFixed(2)} MB — ${nomeArq}` +
+      (anexoSeparado ? ` + comprovante separado de ${(anexoSeparado.bytes.length / 1048576).toFixed(2)} MB` : ""));
 
     // 5. Envia por e-mail
     const destinatarios = (Deno.env.get("RECIBO_DESTINATARIOS") || "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -438,7 +467,9 @@ Deno.serve(async (req) => {
     </div>
     <div style="background:#fff;padding:22px;border:1px solid #e3e8ee;border-top:none;border-radius:0 0 10px 10px">
       <p style="margin:0 0 16px">Segue em anexo o recibo em PDF referente à solicitação abaixo.${
-        record.formulario === "reembolso" ? " O comprovante está incluído no mesmo arquivo." : ""
+        record.formulario !== "reembolso" ? ""
+          : anexoSeparado ? " O comprovante segue como segundo anexo (grande demais para unir ao recibo)."
+          : " O comprovante está incluído no mesmo arquivo."
       }</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px">
         <tr><td style="padding:6px 0;color:#5a6b7b;width:130px">Beneficiário</td><td style="padding:6px 0;font-weight:bold">${esc(nomeBenef)}</td></tr>
