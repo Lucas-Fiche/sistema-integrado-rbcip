@@ -14,8 +14,50 @@
 //  Publique com "Verify JWT" DESLIGADO.
 // =====================================================================
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+
+/* ---------- Acesso ao Supabase por fetch ----------
+   O cliente supabase-js é um módulo grande e era carregado e interpretado em
+   TODA invocação, consumindo CPU do orçamento de 2s. Aqui só se usavam cinco
+   chamadas simples de Storage e REST, então elas viram fetch direto. */
+const SB_URL = Deno.env.get("SUPABASE_URL")!;
+const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const sbAuth = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+
+async function sbBaixar(bucket: string, caminho: string): Promise<Uint8Array | null> {
+  const r = await fetch(`${SB_URL}/storage/v1/object/${bucket}/${caminho}`, { headers: sbAuth });
+  if (!r.ok) { console.error("storage download:", r.status, await r.text()); return null; }
+  return new Uint8Array(await r.arrayBuffer());
+}
+
+async function sbEnviar(bucket: string, caminho: string, bytes: Uint8Array, tipo: string) {
+  const r = await fetch(`${SB_URL}/storage/v1/object/${bucket}/${caminho}`, {
+    method: "POST",
+    headers: { ...sbAuth, "Content-Type": tipo, "x-upsert": "true" },
+    body: bytes,
+  });
+  if (!r.ok) console.error("storage upload:", r.status, await r.text());
+}
+
+async function sbUrlAssinada(bucket: string, caminho: string, segundos: number): Promise<string | null> {
+  const r = await fetch(`${SB_URL}/storage/v1/object/sign/${bucket}/${caminho}`, {
+    method: "POST",
+    headers: { ...sbAuth, "Content-Type": "application/json" },
+    body: JSON.stringify({ expiresIn: segundos }),
+  });
+  if (!r.ok) { console.error("signed url:", r.status, await r.text()); return null; }
+  const j = await r.json();
+  return j?.signedURL ? `${SB_URL}/storage/v1${j.signedURL}` : null;
+}
+
+async function sbAtualizar(id: number, campos: Record<string, unknown>) {
+  const r = await fetch(`${SB_URL}/rest/v1/submissoes?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { ...sbAuth, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(campos),
+  });
+  if (!r.ok) console.error("update submissoes:", r.status, await r.text());
+}
 
 // pdf-lib é uma biblioteca grande: só de CARREGAR e interpretar o módulo já se
 // gasta CPU, e isso acontecia em TODA invocação, mesmo nas que não usam PDF
@@ -291,7 +333,6 @@ Deno.serve(async (req) => {
   let gtoken = "";
   // Criado fora do try para que o catch consiga registrar a falha no banco —
   // sem isso, um erro deixava a solicitação sem qualquer indicação do motivo.
-  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   let idAtual: number | null = null;
   // Cronômetro por etapa: sem isso não dá para saber ONDE os 12 segundos são
   // gastos quando a função é morta por WORKER_RESOURCE_LIMIT.
@@ -329,8 +370,8 @@ Deno.serve(async (req) => {
       const caminho = record.dados?.["Anexar Comprovante/Recibo"];
       if (caminho && !/\s/.test(caminho)) {
         try {
-          const { data } = await db.storage.from("comprovantes").download(caminho);
-          if (data) { compBytes = new Uint8Array(await data.arrayBuffer()); compCaminho = caminho; }
+          const bytes = await sbBaixar("comprovantes", caminho);
+          if (bytes) { compBytes = bytes; compCaminho = caminho; }
         } catch (e) {
           console.error("download do comprovante falhou:", e);
         }
@@ -367,9 +408,8 @@ Deno.serve(async (req) => {
     let imagemPendente = compEhImagem && !!compBytes;
     if (compEhImagem && compBytes) {
       try {
-        const { data: assinada } = await db.storage
-          .from("comprovantes").createSignedUrl(compCaminho, 600);
-        if (!assinada?.signedUrl) throw new Error("sem URL assinada");
+        const urlAssinada = await sbUrlAssinada("comprovantes", compCaminho, 600);
+        if (!urlAssinada) throw new Error("sem URL assinada");
 
         const docResp = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
           headers: { Authorization: `Bearer ${gtoken}` },
@@ -395,7 +435,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             requests: [
               { deleteContentRange: { range: { startIndex: idx, endIndex: idx + MARCADOR.length } } },
-              { insertInlineImage: { location: { index: idx }, uri: assinada.signedUrl, objectSize: tamanho } },
+              { insertInlineImage: { location: { index: idx }, uri: urlAssinada, objectSize: tamanho } },
             ],
           }),
         });
@@ -447,7 +487,7 @@ Deno.serve(async (req) => {
     }
     // Guarda o PDF (já com o comprovante) no Storage para o dashboard exibir
     const reciboPath = `${record.id}-${record.recibo_ano}-${record.recibo_numero}.pdf`;
-    await db.storage.from("recibos").upload(reciboPath, pdfBytes, { contentType: "application/pdf", upsert: true });
+    await sbEnviar("recibos", reciboPath, pdfBytes, "application/pdf");
     marco("PDF salvo no Storage");
     const nomeArq = nomeArquivoRecibo(record);
     // encoding "binary": entrega os bytes ao denomailer sem passar por base64
@@ -524,12 +564,12 @@ Deno.serve(async (req) => {
     // 6. Limpa a cópia e marca como enviado
     await fetch(`https://www.googleapis.com/drive/v3/files/${docId}?supportsAllDrives=true`, { method: "DELETE", headers: { Authorization: `Bearer ${gtoken}` } });
     docId = null;
-    await db.from("submissoes").update({
+    await sbAtualizar(record.id, {
       recibo_enviado_em: new Date().toISOString(),
       recibo_path: reciboPath,
       recibo_erro: null,
       recibo_erro_em: null,
-    }).eq("id", record.id);
+    });
 
     return json({ ok: true, numero: codigo, destinatarios });
   } catch (err) {
@@ -543,9 +583,10 @@ Deno.serve(async (req) => {
     // Registra a falha para o painel mostrar e permitir o reenvio
     if (idAtual != null) {
       try {
-        await db.from("submissoes")
-          .update({ recibo_erro: motivo.slice(0, 500), recibo_erro_em: new Date().toISOString() })
-          .eq("id", idAtual);
+        await sbAtualizar(idAtual, {
+          recibo_erro: motivo.slice(0, 500),
+          recibo_erro_em: new Date().toISOString(),
+        });
       } catch (_) { /* não pode mascarar o erro original */ }
     }
     return json({ ok: false, erro: motivo }, 500);
