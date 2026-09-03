@@ -266,10 +266,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   let docId: string | null = null;
   let gtoken = "";
+  // Criado fora do try para que o catch consiga registrar a falha no banco —
+  // sem isso, um erro deixava a solicitação sem qualquer indicação do motivo.
+  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  let idAtual: number | null = null;
   try {
     const { token, record } = await req.json();
     if (token !== Deno.env.get("RECIBO_TOKEN")) return json({ ok: false, erro: "token_invalido" }, 401);
     if (!record?.id) return json({ ok: false, erro: "sem_record" }, 400);
+    idAtual = record.id;
 
     const templateId = TEMPLATE_ID(record.formulario);
     if (!templateId) return json({ ok: false, erro: "template_nao_configurado: " + record.formulario }, 400);
@@ -286,7 +291,6 @@ Deno.serve(async (req) => {
     if (!copyResp.ok) throw new Error("Drive copy: " + await copyResp.text());
     docId = (await copyResp.json()).id;
 
-    const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     // 2. Reembolso: baixa o comprovante antes, para saber se é imagem ou PDF
     const MARCADOR = "@@COMPROVANTE@@";
@@ -463,7 +467,12 @@ Deno.serve(async (req) => {
     // 6. Limpa a cópia e marca como enviado
     await fetch(`https://www.googleapis.com/drive/v3/files/${docId}?supportsAllDrives=true`, { method: "DELETE", headers: { Authorization: `Bearer ${gtoken}` } });
     docId = null;
-    await db.from("submissoes").update({ recibo_enviado_em: new Date().toISOString(), recibo_path: reciboPath }).eq("id", record.id);
+    await db.from("submissoes").update({
+      recibo_enviado_em: new Date().toISOString(),
+      recibo_path: reciboPath,
+      recibo_erro: null,
+      recibo_erro_em: null,
+    }).eq("id", record.id);
 
     return json({ ok: true, numero: codigo, destinatarios });
   } catch (err) {
@@ -473,6 +482,15 @@ Deno.serve(async (req) => {
       try { await fetch(`https://www.googleapis.com/drive/v3/files/${docId}?supportsAllDrives=true`, { method: "DELETE", headers: { Authorization: `Bearer ${gtoken}` } }); } catch (_) { /* ignora */ }
     }
     const e = err as { message?: string };
-    return json({ ok: false, erro: e?.message || String(err) }, 500);
+    const motivo = e?.message || String(err);
+    // Registra a falha para o painel mostrar e permitir o reenvio
+    if (idAtual != null) {
+      try {
+        await db.from("submissoes")
+          .update({ recibo_erro: motivo.slice(0, 500), recibo_erro_em: new Date().toISOString() })
+          .eq("id", idAtual);
+      } catch (_) { /* não pode mascarar o erro original */ }
+    }
+    return json({ ok: false, erro: motivo }, 500);
   }
 });

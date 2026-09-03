@@ -46,12 +46,29 @@ const COL_INI = [
   { h: "Nome", g: (s) => s.nome || "—" },
   { h: "CPF", g: (s) => fmtCpf(s.cpf) },
 ];
+// Situação do envio do recibo por e-mail
+function estadoEmail(s) {
+  if (s.recibo_enviado_em) return { chave: "ok", rotulo: "Enviado", icone: "✅" };
+  if (s.recibo_erro) return { chave: "erro", rotulo: "Falhou", icone: "❌" };
+  return { chave: "pendente", rotulo: "Não enviado", icone: "⏳" };
+}
+const COL_EMAIL = {
+  h: "E-mail",
+  g: (s) => {
+    const e = estadoEmail(s);
+    return `<span class="email-tag ${e.chave}" title="${esc(s.recibo_erro || e.rotulo)}">${e.icone} ${e.rotulo}</span>`;
+  },
+  html: true,
+  cls: "col-email",
+};
+
 const COL_VALOR = { h: "Valor", g: (s) => fmtValor(s.valor), cls: "col-valor" };
 // Status como primeira coluna: fica sempre visível, mesmo quando a tabela das
 // diárias rola horizontalmente.
 const COL_STATUS = { h: "Status", g: (s) => badgeStatus(s.status), html: true, cls: "col-status" };
 const COL_DIARIAS = [
   COL_STATUS,
+  COL_EMAIL,
   ...COL_INI,
   { h: "Projeto", g: (s) => s.projeto || "—" },
   { h: "Origem → Destino", g: (s) => campoDados(s, "Origem (Estado e Município)") + " → " + campoDados(s, "Destino (Estado e Município)") },
@@ -60,8 +77,8 @@ const COL_DIARIAS = [
 ];
 
 const COLUNAS = {
-  pagamentos: [COL_STATUS, ...COL_INI, { h: "Chave PIX", g: (s) => campoDados(s, "Chave Pix (CPF)") }, COL_VALOR],
-  reembolso: [COL_STATUS, ...COL_INI, { h: "Categoria", g: (s) => campoDados(s, "Categoria da Despesa") }, COL_VALOR],
+  pagamentos: [COL_STATUS, COL_EMAIL, ...COL_INI, { h: "Chave PIX", g: (s) => campoDados(s, "Chave Pix (CPF)") }, COL_VALOR],
+  reembolso: [COL_STATUS, COL_EMAIL, ...COL_INI, { h: "Categoria", g: (s) => campoDados(s, "Categoria da Despesa") }, COL_VALOR],
   "diarias-colaboradores": COL_DIARIAS,
   "diarias-bolsistas": COL_DIARIAS,
 };
@@ -417,15 +434,35 @@ function abrirDetalhe(sub) {
     linhas.push([k, v]);
   });
 
-  const recibo = sub.recibo_path
+  const e = estadoEmail(sub);
+  const painelEmail =
+    '<div class="email-painel ' + e.chave + '">' +
+      '<div class="email-linha">' +
+        '<span class="email-tag ' + e.chave + '">' + e.icone + " " + e.rotulo + "</span>" +
+        (sub.recibo_enviado_em
+          ? '<span class="email-quando">em ' + esc(fmtData(sub.recibo_enviado_em)) + "</span>"
+          : "") +
+        '<button type="button" class="btn btn-secondary btn-reenviar" id="reenviar">' +
+          (e.chave === "ok" ? "↻ Enviar novamente" : "↻ Tentar enviar") +
+        "</button>" +
+      "</div>" +
+      (sub.recibo_erro
+        ? '<p class="email-motivo"><b>Motivo:</b> ' + esc(sub.recibo_erro) + "</p>"
+        : "") +
+      '<p class="email-aviso" id="reenvio-msg" hidden></p>' +
+    "</div>";
+
+  const recibo = painelEmail + (sub.recibo_path
     ? `<button type="button" class="btn btn-secondary" id="ver-recibo" style="margin-bottom:16px">📄 Ver recibo (PDF)</button>`
-    : `<p class="vazio-min" style="margin-bottom:16px">Recibo ainda não disponível para esta solicitação.</p>`;
+    : `<p class="vazio-min" style="margin-bottom:16px">Recibo ainda não disponível para esta solicitação.</p>`);
   body.innerHTML = recibo + linhas
     .map(([k, v, html]) => `<div class="det-linha"><div class="k">${esc(k)}</div><div class="v">${html ? v : esc(v)}</div></div>`)
     .join("") +
     '<div id="historico"><p class="vazio-min" style="margin-top:16px">Carregando histórico…</p></div>';
   const btnRecibo = document.getElementById("ver-recibo");
   if (btnRecibo) btnRecibo.onclick = () => verRecibo(sub.recibo_path, btnRecibo);
+  const btnReenviar = document.getElementById("reenviar");
+  if (btnReenviar) btnReenviar.onclick = () => reenviarRecibo(sub, btnReenviar);
   body.querySelectorAll(".link-anexo").forEach((b) => {
     b.onclick = () => verAnexo(b.dataset.anexo, b);
   });
@@ -475,6 +512,35 @@ async function renderHistorico(submissaoId) {
       '<span class="hist-meta">por <b>' + esc(autor) + "</b> · " + fmtData(h.criado_em) + "</span>" +
       "</li>";
   }).join("") + "</ul>";
+}
+
+// Reenvia o recibo. A função no banco (SECURITY DEFINER) é quem lê o token e
+// chama a Edge Function — o navegador nunca vê o token.
+async function reenviarRecibo(sub, btn) {
+  const msg = document.getElementById("reenvio-msg");
+  const txt = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Enviando…";
+  const { error } = await supa.rpc("fn_reenviar_recibo", { p_id: sub.id });
+  btn.textContent = txt;
+  if (error) {
+    console.error("reenviarRecibo:", error);
+    btn.disabled = false;
+    if (msg) {
+      msg.hidden = false;
+      msg.className = "email-aviso erro";
+      msg.textContent = "Não foi possível solicitar o reenvio: " + (error.message || "erro desconhecido");
+    }
+    return;
+  }
+  if (msg) {
+    msg.hidden = false;
+    msg.className = "email-aviso ok";
+    msg.textContent = "Reenvio solicitado. A geração leva alguns segundos — " +
+      "use “Atualizar” para ver o resultado.";
+  }
+  // Dá tempo da função rodar antes de reler o estado
+  setTimeout(() => carregar(), 8000);
 }
 
 // O upload nomeia o arquivo como "<timestamp>-<nome>"; quando o envio falha,
