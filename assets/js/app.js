@@ -219,13 +219,49 @@ function ativarFormulario(config) {
     });
   }
 
-  // Prévia + validação do comprovante (imagem)
+  /* ----- Redução da imagem antes do envio -----
+     Foto de celular tem 3-5 MB e entra em resolução original no PDF do
+     recibo. Isso estourava o limite de CPU da função que monta e envia o
+     e-mail. Reduzir aqui, no navegador, resolve na origem: a CPU é do
+     usuário, o upload fica rápido e o PDF final fica leve.
+     1800px de lado maior mantém um comprovante perfeitamente legível. */
+  const LADO_MAX = 1800;
+  const QUALIDADE = 0.82;
+
+  async function reduzirImagem(file) {
+    if (!file.type.startsWith("image/")) return file;          // PDF passa direto
+    if (file.type === "image/gif") return file;                // preserva animação
+    let bitmap;
+    try {
+      // from-image respeita a orientação EXIF (foto de celular deitada)
+      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch (_) {
+      return file; // navegador sem suporte: envia o original
+    }
+    const escala = Math.min(LADO_MAX / bitmap.width, LADO_MAX / bitmap.height, 1);
+    // Já é pequena e leve: não recomprime (evita perder qualidade à toa)
+    if (escala === 1 && file.size <= 1024 * 1024) { bitmap.close(); return file; }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * escala);
+    canvas.height = Math.round(bitmap.height * escala);
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+
+    const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", QUALIDADE));
+    if (!blob || blob.size >= file.size) return file;  // não ficou menor: mantém
+    const nome = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], nome, { type: "image/jpeg" });
+  }
+
+  // Prévia + validação do comprovante
   form.querySelectorAll('input[type="file"]').forEach((inp) => {
     const field = inp.closest(".field");
-    inp.addEventListener("change", () => {
+    inp.addEventListener("change", async () => {
       const antiga = field.querySelector(".file-preview");
       if (antiga) antiga.remove();
       clearEstado(field);
+      inp._arquivoPronto = null;
       const f = inp.files && inp.files[0];
       if (!f) return;
       const ehImagem = f.type.startsWith("image/");
@@ -235,6 +271,7 @@ function ativarFormulario(config) {
         inp.value = ""; return;
       }
       if (f.size > 8 * 1024 * 1024) { setError(field, "Arquivo muito grande (máx. 8 MB). Reduza e tente novamente."); inp.value = ""; return; }
+
       const prev = document.createElement("div");
       prev.className = "file-preview";
       const span = document.createElement("span");
@@ -252,6 +289,14 @@ function ativarFormulario(config) {
       }
       field.appendChild(prev);
       setValido(field);
+
+      let pronto = f;
+      try { pronto = await reduzirImagem(f); } catch (e) { console.error("reduzir imagem:", e); }
+      inp._arquivoPronto = pronto;
+      if (pronto !== f) {
+        span.textContent = `${f.name} · ${(pronto.size / 1048576).toFixed(2)} MB ` +
+          `(otimizado de ${(f.size / 1048576).toFixed(2)} MB)`;
+      }
     });
   });
 
@@ -522,15 +567,18 @@ function ativarFormulario(config) {
             if (inp.files && inp.files[0]) {
               const campo = inp.closest(".field");
               const label = (campo && campo.dataset.label) || "Anexo";
+              // Usa a versão já reduzida quando houver (evita subir a foto
+              // original de vários MB, que estourava a CPU na geração do PDF)
+              const arquivo = inp._arquivoPronto || inp.files[0];
               // Falha no anexo NÃO pode passar batido: antes o envio seguia com
               // o nome do arquivo no lugar do caminho, e o comprovante sumia.
               try {
-                dados[label] = await window.rbcipDB.uploadArquivo(inp.files[0]);
+                dados[label] = await window.rbcipDB.uploadArquivo(arquivo);
               } catch (e) {
                 console.error("upload do anexo falhou:", e);
                 if (campo) setError(campo, "Não foi possível enviar este arquivo. Tente novamente.");
                 const det = [e && e.message, e && e.error, e && e.statusCode].filter(Boolean).join(" · ");
-                throw new Error("Falha ao enviar o anexo \"" + inp.files[0].name + "\"" + (det ? " (" + det + ")" : ""));
+                throw new Error("Falha ao enviar o anexo \"" + arquivo.name + "\"" + (det ? " (" + det + ")" : ""));
               }
             }
           }
