@@ -231,6 +231,24 @@ const CORS = {
 };
 const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
 
+/* ---------- Chamadas ao Google com repetição ----------
+   As APIs do Google devolvem 500/503 esporádicos e o próprio Google orienta
+   repetir com espera progressiva. Sem isso, um "Internal Error" momentâneo
+   derrubava a geração inteira do recibo. A espera custa tempo de parede, que
+   sobra, e quase nenhuma CPU, que é o recurso escasso aqui. */
+async function fetchGoogle(url: string, init: RequestInit, tentativas = 3): Promise<Response> {
+  for (let i = 0; ; i++) {
+    const r = await fetch(url, init);
+    // Transitórios: vale insistir. Demais erros são definitivos.
+    const transitorio = r.status === 408 || r.status === 429 || r.status >= 500;
+    if (r.ok || !transitorio || i >= tentativas - 1) return r;
+    try { await r.body?.cancel(); } catch (_) { /* ignora */ }
+    const espera = 600 * 2 ** i + Math.floor(Math.random() * 300);
+    console.log(`Google respondeu ${r.status}; tentativa ${i + 2} em ${espera}ms`);
+    await new Promise((s) => setTimeout(s, espera));
+  }
+}
+
 /* ---------- Autenticação Google (Service Account) ---------- */
 const b64url = (b: Uint8Array | string) =>
   btoa(typeof b === "string" ? b : String.fromCharCode(...b)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -254,7 +272,7 @@ async function tokenGoogle(): Promise<string> {
   const key = await importarChave(Deno.env.get("GOOGLE_SA_PRIVATE_KEY")!);
   const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
   const jwt = `${unsigned}.${b64url(new Uint8Array(sig))}`;
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await fetchGoogle("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }),
@@ -352,7 +370,7 @@ Deno.serve(async (req) => {
     const folderId = Deno.env.get("DRIVE_FOLDER_ID");
 
     // 1. Copia o modelo (supportsAllDrives: necessário para Drives Compartilhados)
-    const copyResp = await fetch(`https://www.googleapis.com/drive/v3/files/${templateId}/copy?supportsAllDrives=true`, {
+    const copyResp = await fetchGoogle(`https://www.googleapis.com/drive/v3/files/${templateId}/copy?supportsAllDrives=true`, {
       method: "POST",
       headers: { Authorization: `Bearer ${gtoken}`, "Content-Type": "application/json" },
       body: JSON.stringify({ name: nomeArquivoRecibo(record).replace(/\.pdf$/, ""), parents: folderId ? [folderId] : undefined }),
@@ -393,7 +411,7 @@ Deno.serve(async (req) => {
     const requests = Object.entries(reps).map(([text, replaceText]) => ({
       replaceAllText: { containsText: { text, matchCase: true }, replaceText: replaceText || "—" },
     }));
-    const upd = await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+    const upd = await fetchGoogle(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
       method: "POST",
       headers: { Authorization: `Bearer ${gtoken}`, "Content-Type": "application/json" },
       body: JSON.stringify({ requests }),
@@ -411,7 +429,7 @@ Deno.serve(async (req) => {
         const urlAssinada = await sbUrlAssinada("comprovantes", compCaminho, 600);
         if (!urlAssinada) throw new Error("sem URL assinada");
 
-        const docResp = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+        const docResp = await fetchGoogle(`https://docs.googleapis.com/v1/documents/${docId}`, {
           headers: { Authorization: `Bearer ${gtoken}` },
         });
         if (!docResp.ok) throw new Error("Docs get: " + await docResp.text());
@@ -429,7 +447,7 @@ Deno.serve(async (req) => {
             }
           : { width: { magnitude: MAX_L, unit: "PT" } };
 
-        const ins = await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+        const ins = await fetchGoogle(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
           method: "POST",
           headers: { Authorization: `Bearer ${gtoken}`, "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -449,7 +467,7 @@ Deno.serve(async (req) => {
     }
 
     // 5. Exporta em PDF
-    const exp = await fetch(`https://www.googleapis.com/drive/v3/files/${docId}/export?mimeType=application/pdf`, {
+    const exp = await fetchGoogle(`https://www.googleapis.com/drive/v3/files/${docId}/export?mimeType=application/pdf`, {
       headers: { Authorization: `Bearer ${gtoken}` },
     });
     if (!exp.ok) throw new Error("Drive export: " + await exp.text());
