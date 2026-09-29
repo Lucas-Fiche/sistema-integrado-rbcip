@@ -17,6 +17,10 @@
 | 7 | `schema_auditoria.sql` | `submissoes_log`: quem alterou cada status |
 | 8 | `schema_terceiros.sql` | Preenchimento para terceiros (**substitui** a função do #6) |
 | 9 | `schema_protege_identidade2.sql` | Protege o cadastro de quem tem conta ou é bolsista |
+| 10 | `schema_ver_comprovante.sql` | Deixa o staff abrir os comprovantes anexados |
+| 11 | `schema_status_email.sql` | Guarda o resultado do envio do recibo (`recibo_erro`) |
+| 12 | `schema_fila_recibo.sql` | Fila de envio: rastreia a chamada, conta tentativas e permite reenvio (**substitui** o disparo do #4 e a função do #11) |
+| 13 | `schema_cron_recibo.sql` | Agenda o reprocessamento automático dos recibos pendentes |
 
 Ao final, rode **`verificar_estado.sql`** para confirmar que o banco está no
 estado esperado.
@@ -28,6 +32,8 @@ estado esperado.
 | `schema_protege_identidade.sql` | `schema_protege_identidade2.sql` | Volta a preencher campos vazios do cadastro com dados de terceiros |
 | `schema_comprovante.sql` (`fn_registrar_submissao`) | `schema_terceiros.sql` | Para de registrar quem preencheu para terceiros |
 | `schema.sql` (`fn_registrar_pessoa`) | `schema_protege_identidade2.sql` | **Reabre a falha**: formulário volta a sobrescrever o cadastro de outra pessoa |
+| `schema_recibo.sql` (`fn_enviar_recibo`) | `schema_fila_recibo.sql` | Volta o envio "dispara e esquece": falha vira silêncio e ninguém é pago |
+| `schema_status_email.sql` (`fn_reenviar_recibo`) | `schema_fila_recibo.sql` | O reenvio deixa de contar tentativas e volta ao tempo-limite de 5s |
 
 > Se precisar reexecutar `schema.sql` (ex.: recriar tabelas), rode **sempre**
 > `schema_protege_identidade2.sql` logo em seguida.
@@ -38,6 +44,7 @@ estado esperado.
 |---|---|
 | `verificar_estado.sql` | Confere se o banco está no estado esperado — rode após qualquer mudança |
 | `limpar_dados_teste.sql` | Apaga submissões de teste e zera a numeração (irreversível) |
+| `diagnostico_email.sql` | Recibo não chegou: isola se falhou o gatilho ou a Edge Function |
 
 ## Edge Functions
 

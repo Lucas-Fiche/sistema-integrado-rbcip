@@ -1,3 +1,8 @@
+-- ⚠️ ATENÇÃO: a função fn_reenviar_recibo deste arquivo foi SUBSTITUÍDA
+--    por schema_fila_recibo.sql (que conta tentativas e espera 60s pela
+--    resposta). As colunas continuam válidas. Se rodar este arquivo,
+--    rode schema_fila_recibo.sql em seguida. Veja supabase/README.md.
+
 -- =====================================================================
 --  Status do envio do recibo por e-mail + reenvio manual
 --  Execute no SQL Editor.

@@ -221,8 +221,71 @@ async function carregar() {
     .order("criado_em", { ascending: false });
   if (error) { console.error("carregar submissoes:", error); TODAS = []; }
   else { TODAS = data || []; }
+  renderAvisoEnvio();
   renderTabs();
   aplicarFiltros();
+}
+
+/* ---------- Aviso de recibos sem envio ----------
+   O e-mail do recibo é o que põe o pagamento em movimento. Um envio que
+   falha em silêncio atrasa o dinheiro de alguém, então a pendência é
+   mostrada no topo do painel — em todos os formulários, não só na aba
+   aberta — com o reenvio a um clique. */
+function renderAvisoEnvio() {
+  const caixa = document.getElementById("aviso-envio");
+  if (!caixa) return;
+  const pendentes = TODAS.filter((s) => !s.recibo_enviado_em);
+  if (!pendentes.length) { caixa.hidden = true; caixa.innerHTML = ""; return; }
+
+  const falhas = pendentes.filter((s) => s.recibo_erro).length;
+  const quantos = pendentes.length === 1
+    ? "1 recibo não foi enviado por e-mail"
+    : pendentes.length + " recibos não foram enviados por e-mail";
+  const detalhe = falhas
+    ? ` (${falhas} com erro registrado)`
+    : "";
+
+  caixa.hidden = false;
+  caixa.innerHTML =
+    `<span class="aviso-texto">⚠️ <b>${quantos}</b>${detalhe}. ` +
+    "Enquanto o e-mail não chega, o pagamento não é processado.</span>" +
+    '<button type="button" class="btn-reenviar-todos" id="btn-reenviar-todos">↻ Reenviar todos</button>' +
+    '<p class="aviso-msg" id="aviso-envio-msg" hidden></p>';
+
+  document.getElementById("btn-reenviar-todos").onclick = (ev) =>
+    reenviarPendentes(pendentes.length, ev.currentTarget);
+}
+
+// Reenvia de uma vez tudo que está sem e-mail. Quem lê o token e chama a
+// Edge Function é a função no banco — o navegador nunca vê o token.
+async function reenviarPendentes(quantos, btn) {
+  const msg = document.getElementById("aviso-envio-msg");
+  const mostrar = (texto, classe) => {
+    if (!msg) return;
+    msg.hidden = false;
+    msg.className = "aviso-msg " + classe;
+    msg.textContent = texto;
+  };
+
+  btn.disabled = true;
+  btn.textContent = "Reenviando…";
+  const { data, error } = await supa.rpc("fn_reenviar_pendentes", { p_limite: 25 });
+  if (error) {
+    console.error("reenviarPendentes:", error);
+    btn.disabled = false;
+    btn.textContent = "↻ Reenviar todos";
+    mostrar("Não foi possível solicitar o reenvio: " + (error.message || "erro desconhecido"), "erro");
+    return;
+  }
+
+  const n = (data && data.reenviados) != null ? data.reenviados : quantos;
+  mostrar(
+    `Reenvio solicitado para ${n} ${n === 1 ? "recibo" : "recibos"}. ` +
+    "Cada um leva alguns segundos para ser gerado; o painel se atualiza sozinho em instantes.",
+    "ok",
+  );
+  // Dá tempo das gerações terminarem antes de reler o estado
+  setTimeout(() => carregar(), 20000);
 }
 
 /* ---------- Abas por formulário ---------- */

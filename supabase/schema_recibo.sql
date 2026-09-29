@@ -80,6 +80,10 @@ on conflict (chave) do nothing;
 alter table app_config enable row level security;
 
 -- 5. Ao inserir a submissão, chama a Edge Function que gera e envia o recibo
+--    ⚠️ Esta versão foi SUBSTITUÍDA por schema_fila_recibo.sql: aqui a
+--    chamada é "dispara e esquece" (falha vira silêncio) e o pg_net espera
+--    só 5s. Se reexecutar este arquivo, rode schema_fila_recibo.sql
+--    logo em seguida.
 create extension if not exists pg_net;
 
 create or replace function fn_enviar_recibo()
