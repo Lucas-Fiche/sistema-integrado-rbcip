@@ -149,9 +149,15 @@ $$;
 grant execute on function fn_reenviar_pendentes(int) to authenticated;
 
 -- 6. Reprocessamento automático ----------------------------------------
---    Chamado pelo agendador (schema_cron_recibo.sql). Só pega o que ficou
+--    Chamado pelo agendador (schema_cron_recibo.sql). Pega o que ficou
 --    para trás, respeita um intervalo entre tentativas e desiste depois de
 --    5 tentativas — assim uma falha permanente não vira e-mail infinito.
+--
+--    Sem recorte por idade: um recibo de dois meses atrás que nunca saiu
+--    continua sendo dinheiro que alguém não recebeu. O teto de tentativas
+--    e o `limite` por rodada já seguram o volume; a idade não segura nada
+--    e só serviria para esconder o caso mais antigo — que é justamente o
+--    mais urgente.
 create or replace function fn_reprocessar_recibos(p_limite int default 10)
 returns jsonb
 language plpgsql
@@ -166,9 +172,11 @@ begin
     select id from submissoes
      where recibo_enviado_em is null
        and coalesce(recibo_tentativas, 0) < 5
-       and criado_em > now() - interval '30 days'
+       -- 9 min, não 10: com o agendador de 10 em 10 minutos, comparar com
+       -- o intervalo exato cai em cima da borda e faz pular rodadas na
+       -- sorte dos microssegundos.
        and (recibo_tentado_em is null
-            or recibo_tentado_em < now() - interval '10 minutes')
+            or recibo_tentado_em < now() - interval '9 minutes')
      order by criado_em
      limit greatest(coalesce(p_limite, 10), 0)
   loop
@@ -183,9 +191,31 @@ $$;
 -- Só o agendador e o service_role chamam esta função.
 revoke execute on function fn_reprocessar_recibos(int) from public;
 
--- 7. As solicitações antigas nunca foram contadas ----------------------
---    Elas têm recibo_tentativas = 0 e recibo_tentado_em nulo, então o
---    reprocessamento vai pegá-las na primeira rodada. É o que queremos.
+-- 7. Devolver à fila o que bateu no teto de tentativas ------------------
+--    Depois de corrigir a causa de uma falha, isto zera o contador e o
+--    reprocessamento volta a considerar a solicitação.
+create or replace function fn_destravar_recibo(p_id bigint)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not fn_is_staff() then
+    raise exception 'apenas a equipe de gestão pode destravar recibos';
+  end if;
+
+  update submissoes
+     set recibo_tentativas = 0,
+         recibo_erro       = null,
+         recibo_erro_em    = null
+   where id = p_id;
+
+  return jsonb_build_object('ok', true, 'id', p_id);
+end;
+$$;
+
+grant execute on function fn_destravar_recibo(bigint) to authenticated;
 
 -- =====================================================================
 --  CONFERÊNCIA — o que está pendente e o que o servidor respondeu
