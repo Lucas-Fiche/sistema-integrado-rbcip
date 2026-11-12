@@ -231,6 +231,186 @@ const CORS = {
 };
 const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
 
+/* =====================================================================
+   Corpo do e-mail (padrão visual RBCIP)
+
+   Regras de e-mail, que não são as da web:
+   - Layout em <table>. Flex e grid não existem no Outlook.
+   - Estilo inline. <style> no <head> é descartado por vários clientes.
+   - Gradiente só como enfeite: o bgcolor sólido é o que realmente aparece
+     no Outlook, então a barra continua azul-petróleo mesmo sem ele.
+   - A logo é branca sobre fundo escuro e mora no site. Quase todo cliente
+     bloqueia imagem remota na primeira abertura, então o fundo da barra
+     já é da marca e o alt descreve a logo — bloqueada, o e-mail continua
+     com a cara da RBCIP.
+   ===================================================================== */
+
+const LOGO_URL = "https://solicitacoes.rbcip.org/assets/img/logo.png";
+
+const ROTULO_FORM: Record<string, string> = {
+  pagamentos: "Pagamento",
+  reembolso: "Reembolso",
+  "diarias-colaboradores": "Diárias — Colaboradores",
+  "diarias-bolsistas": "Diárias — Bolsistas",
+};
+
+/* Campos de detalhe por formulário, na ordem em que aparecem no e-mail.
+   As chaves são os rótulos dos formulários (data-label), que é como o
+   registro guarda cada resposta. "__periodo__" é montado à parte: as duas
+   datas da diária lidas juntas valem mais que duas linhas soltas. */
+const DETALHES_FORM: Record<string, string[]> = {
+  pagamentos: ["Projeto de Referência", "Descrição Sumária das Atividades"],
+  reembolso: ["Projeto de Referência", "Categoria da Despesa", "Descrição do Pagamento"],
+  "diarias-colaboradores": [
+    "Projeto de Referência", "Cargo/Função",
+    "Origem (Estado e Município)", "Destino (Estado e Município)",
+    "__periodo__",
+    "Descrição Sumária das Atividades, Reuniões ou Atividades",
+  ],
+  "diarias-bolsistas": [
+    "Projeto de Referência", "Cargo/Função",
+    "Origem (Estado e Município)", "Destino (Estado e Município)",
+    "__periodo__",
+    "Descrição Sumária das Atividades, Reuniões ou Atividades",
+  ],
+};
+
+const escHtml = (s: unknown) =>
+  String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/* Data em pt-BR.
+   "2026-11-18" é uma data de calendário, não um instante: o JS a lê como
+   meia-noite UTC e, convertida para Brasília (UTC-3), volta um dia — o
+   período da diária aparecia 18→17. Datas puras são formatadas direto,
+   sem fuso; só carimbos de tempo completos (criado_em) são convertidos. */
+const dataBR = (iso: unknown) => {
+  const s = String(iso ?? "").trim();
+  if (!s) return "";
+  const soData = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (soData) return `${soData[3]}/${soData[2]}/${soData[1]}`;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? "" : d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+};
+
+/* Uma linha rótulo/valor. O valor vai à direita, como no extrato. */
+function linhaDetalhe(rotulo: string, valor: string, destaque = false): string {
+  if (!valor) return "";
+  return `<tr>
+    <td style="padding:9px 0;font-size:14px;color:#5c6b78;vertical-align:top;width:42%">${escHtml(rotulo)}</td>
+    <td align="right" style="padding:9px 0;font-size:14px;color:#1c2530;vertical-align:top;${
+      destaque ? "font-weight:bold;" : ""
+    }">${escHtml(valor)}</td>
+  </tr>`;
+}
+
+function secao(titulo: string, linhas: string): string {
+  if (!linhas) return "";
+  return `<tr><td bgcolor="#ffffff" style="background:#ffffff;padding:4px 28px 0">
+    <h2 style="margin:22px 0 2px;font-size:16px;font-weight:bold;color:#1c2530;letter-spacing:-.2px">${escHtml(titulo)}</h2>
+    <table role="presentation" width="100%" style="border-collapse:collapse">${linhas}</table>
+  </td></tr>`;
+}
+
+function montarEmailHtml(record: any, opts: { anexoSeparado: boolean }): string {
+  const dados = record?.dados || {};
+  const campo = (k: string) => {
+    const v = dados[k];
+    return Array.isArray(v) ? v.join(", ") : String(v ?? "").trim();
+  };
+
+  const codigo = codigoRecibo(record);
+  const rotulo = ROTULO_FORM[record.formulario] || record.formulario;
+  const valor = fmtRS(Number(record.valor || 0));
+  const data = dataBR(record.criado_em) || dataBR(new Date().toISOString());
+
+  // Beneficiário
+  const linhasPessoa =
+    linhaDetalhe("Nome", record.nome || campo("Nome Completo"), true) +
+    linhaDetalhe("CPF", record.cpf || campo("CPF")) +
+    linhaDetalhe("Chave PIX", campo("Chave Pix (CPF)"));
+
+  // Período da diária: duas datas lidas como um intervalo só
+  const ini = dataBR(campo("Período Inicial"));
+  const fim = dataBR(campo("Período Final"));
+  const periodo = ini && fim ? `${ini} a ${fim}` : (ini || fim);
+
+  // Detalhes próprios do formulário
+  const linhasForm = (DETALHES_FORM[record.formulario] || [])
+    .map((k) => k === "__periodo__"
+      ? linhaDetalhe("Período", periodo)
+      : linhaDetalhe(k.replace(/, Reuniões ou Atividades$/, ""), campo(k)))
+    .join("");
+
+  // Preenchimento por terceiro: quem respondeu não é quem recebe
+  const linhasTerceiro = record.por_terceiro
+    ? linhaDetalhe("Preenchido por", record.preenchido_por_nome || "—", true) +
+      linhaDetalhe("E-mail", record.preenchido_por_email || "")
+    : "";
+
+  const notaAnexo = record.formulario !== "reembolso"
+    ? "O recibo segue em anexo, em PDF."
+    : opts.anexoSeparado
+      ? "O recibo segue em anexo, em PDF. O comprovante vai como segundo anexo — é grande demais para ser unido ao recibo."
+      : "O recibo segue em anexo, em PDF, já com o comprovante incluído no mesmo arquivo.";
+
+  return `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recibo ${escHtml(codigo)}</title></head>
+<body style="margin:0;padding:0;background:#eef2f5">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">Recibo ${escHtml(codigo)} — ${escHtml(rotulo)} — ${escHtml(valor)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#eef2f5">
+<tr><td align="center" style="padding:24px 12px">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;border-collapse:collapse;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif">
+
+  <!-- Barra de marca -->
+  <tr><td bgcolor="#004e6b" align="center" style="background-color:#004e6b;background-image:linear-gradient(90deg,#004e6b 0%,#2f166e 100%);padding:24px;border-radius:12px 12px 0 0">
+    <img src="${LOGO_URL}" width="170" height="57" alt="RBCIP" style="display:block;border:0;outline:none;text-decoration:none;height:57px;width:170px;color:#ffffff;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:22px;font-weight:bold;line-height:57px;letter-spacing:2px">
+  </td></tr>
+
+  <!-- Identificação do recibo -->
+  <tr><td bgcolor="#ffffff" style="background:#ffffff;padding:28px 28px 0">
+    <div style="font-size:12px;font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;color:#308ead">${escHtml(rotulo)}</div>
+    <h1 style="margin:6px 0 0;font-size:27px;line-height:1.2;font-weight:bold;color:#1c2530;letter-spacing:-.4px">Recibo ${escHtml(codigo)}</h1>
+    <p style="margin:6px 0 0;font-size:14px;color:#5c6b78">Solicitação registrada em ${escHtml(data)}.</p>
+  </td></tr>
+
+  <!-- Total -->
+  <tr><td bgcolor="#ffffff" style="background:#ffffff;padding:22px 28px 0">
+    <table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #e3e8ee;border-bottom:1px solid #e3e8ee">
+      <tr>
+        <td style="padding:18px 0;font-size:21px;font-weight:bold;color:#1c2530">Total</td>
+        <td align="right" style="padding:18px 0;font-size:27px;font-weight:bold;color:#004e6b;letter-spacing:-.5px">${escHtml(valor)}</td>
+      </tr>
+    </table>
+  </td></tr>
+
+  ${secao("Beneficiário", linhasPessoa)}
+  ${secao("Detalhes da solicitação", linhasForm)}
+  ${secao("Preenchimento", linhasTerceiro)}
+
+  <!-- Anexos -->
+  <tr><td bgcolor="#ffffff" style="background:#ffffff;padding:24px 28px 28px">
+    <table role="presentation" width="100%" style="border-collapse:collapse;background:#f4f8fa;border-left:3px solid #308ead;border-radius:6px">
+      <tr><td style="padding:14px 16px;font-size:14px;color:#1c2530;line-height:1.5">📎 ${escHtml(notaAnexo)}</td></tr>
+    </table>
+  </td></tr>
+
+  <!-- Rodapé -->
+  <tr><td bgcolor="#1c2530" style="background:#1c2530;padding:22px 28px;border-radius:0 0 12px 12px">
+    <p style="margin:0;font-size:13px;font-weight:bold;color:#ffffff;letter-spacing:.3px">RBCIP — pesquisa e inovação</p>
+    <p style="margin:6px 0 0;font-size:12px;color:#9fb0bd;line-height:1.6">
+      Mensagem automática do Sistema de Solicitações.<br>
+      Acompanhe as solicitações em <a href="https://solicitacoes.rbcip.org/admin/" style="color:#7fc4de;text-decoration:underline">solicitacoes.rbcip.org</a>.
+    </p>
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
 /* ---------- Chamadas ao Google com repetição ----------
    As APIs do Google devolvem 500/503 esporádicos e o próprio Google orienta
    repetir com espera progressiva. Sem isso, um "Internal Error" momentâneo
@@ -531,38 +711,9 @@ Deno.serve(async (req) => {
     const client = new SMTPClient({
       connection: { hostname: "smtp.gmail.com", port: 465, tls: true, auth: { username: Deno.env.get("GMAIL_USER")!, password: Deno.env.get("GMAIL_APP_PASSWORD")! } },
     });
-    const nomeBenef = record.nome || "-";
-    const cpfBenef = record.cpf || "-";
-    const valorBenef = fmtRS(Number(record.valor || 0));
     const codigo = codigoRecibo(record);
-    const rotuloForm = ({
-      pagamentos: "Pagamento",
-      reembolso: "Reembolso",
-      "diarias-colaboradores": "Diárias — Colaboradores",
-      "diarias-bolsistas": "Diárias — Bolsistas",
-    } as Record<string, string>)[record.formulario] || record.formulario;
-    const esc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const html = `<!doctype html><html><body style="margin:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1c2b3a">
-  <div style="max-width:560px;margin:0 auto;padding:24px 16px">
-    <div style="background:#17324d;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0">
-      <div style="font-size:17px;font-weight:bold">Recibo ${esc(codigo)}</div>
-      <div style="font-size:13px;font-weight:600;color:#f0d79a;margin-top:3px;letter-spacing:.3px">${esc(rotuloForm)}</div>
-    </div>
-    <div style="background:#fff;padding:22px;border:1px solid #e3e8ee;border-top:none;border-radius:0 0 10px 10px">
-      <p style="margin:0 0 16px">Segue em anexo o recibo em PDF referente à solicitação abaixo.${
-        record.formulario !== "reembolso" ? ""
-          : anexoSeparado ? " O comprovante segue como segundo anexo (grande demais para unir ao recibo)."
-          : " O comprovante está incluído no mesmo arquivo."
-      }</p>
-      <table style="width:100%;border-collapse:collapse;font-size:14px">
-        <tr><td style="padding:6px 0;color:#5a6b7b;width:130px">Beneficiário</td><td style="padding:6px 0;font-weight:bold">${esc(nomeBenef)}</td></tr>
-        <tr><td style="padding:6px 0;color:#5a6b7b">CPF</td><td style="padding:6px 0">${esc(cpfBenef)}</td></tr>
-        <tr><td style="padding:6px 0;color:#5a6b7b">Valor</td><td style="padding:6px 0;font-weight:bold">${esc(valorBenef)}</td></tr>
-      </table>
-      <p style="margin:20px 0 0;font-size:12px;color:#8a97a4">Mensagem automática do Sistema de Solicitações - RBCIP.</p>
-    </div>
-  </div>
-</body></html>`;
+    const rotuloForm = ROTULO_FORM[record.formulario] || record.formulario;
+    const html = montarEmailHtml(record, { anexoSeparado: !!anexoSeparado });
     // Assunto em ASCII puro: acentos/traços longos em cabeçalho (RFC 2047) podem
     // corromper o MIME em alguns clientes (era o caso das Diárias). O texto
     // bonito com acentos fica no corpo HTML, que é codificado corretamente.
@@ -571,7 +722,7 @@ Deno.serve(async (req) => {
     await client.send({
       from: Deno.env.get("GMAIL_USER")!,
       to: destinatarios,
-      subject: semAcento(`Recibo ${codigo} - ${rotuloForm} - ${record.nome || ""}`),
+      subject: semAcento(`Recibo ${codigo} - ${rotuloForm} - ${record.nome || ""} - ${fmtRS(Number(record.valor || 0))}`),
       content: "auto",
       html,
       attachments: anexos as any,
