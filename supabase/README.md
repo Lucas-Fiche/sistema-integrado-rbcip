@@ -45,6 +45,7 @@ estado esperado.
 | `verificar_estado.sql` | Confere se o banco está no estado esperado — rode após qualquer mudança |
 | `limpar_dados_teste.sql` | Apaga submissões de teste e zera a numeração (irreversível) |
 | `diagnostico_email.sql` | Recibo não chegou: isola se falhou o gatilho ou a Edge Function |
+| `diagnostico_envio.sql` | **Comece por aqui** quando um recibo não sair: dá o veredito de cada pendência numa linha só |
 
 ## Edge Functions
 
