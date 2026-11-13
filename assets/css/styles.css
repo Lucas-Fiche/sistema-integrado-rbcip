@@ -534,8 +534,12 @@ textarea { min-height: 96px; resize: vertical; }
   border-radius: 6px;
   padding: 8px 11px;
 }
-/* [hidden] é só display:none do navegador — um display explícito o venceria */
-.quem-preenche [hidden], .terceiro-box [hidden] { display: none !important; }
+/* [hidden] é só display:none do navegador — qualquer display explícito o
+   vence. O guard já existiu aqui restrito a dois blocos, e foi por isso que
+   o problema reapareceu noutro elemento: o aviso de recibos pendentes, com
+   display:flex, continuava ocupando espaço como uma faixa vazia. Vale para
+   o documento inteiro, então nenhum elemento futuro repete o caso. */
+[hidden] { display: none !important; }
 .qp-campos { display: grid; gap: 12px; }
 .qp-campos label { font-weight: 600; font-size: 0.9rem; display: block; }
 .qp-campos input { margin-top: 4px; }
