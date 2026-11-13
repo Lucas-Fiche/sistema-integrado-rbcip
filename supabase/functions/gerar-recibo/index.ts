@@ -30,8 +30,21 @@ async function sbBaixar(bucket: string, caminho: string): Promise<Uint8Array | n
   return new Uint8Array(await r.arrayBuffer());
 }
 
-async function sbEnviar(bucket: string, caminho: string, bytes: Uint8Array, tipo: string) {
+/* Tamanho do arquivo sem baixá-lo.
+   Um comprovante grande precisa ser detectado ANTES do download: baixar
+   megabytes só para descobrir que não dá para usá-los já custa memória e
+   tempo do orçamento apertado da função. */
+async function sbTamanho(bucket: string, caminho: string): Promise<number | null> {
   const r = await fetch(`${SB_URL}/storage/v1/object/${bucket}/${caminho}`, {
+    method: "HEAD",
+    headers: sbAuth,
+  });
+  if (!r.ok) { console.error("storage head:", r.status); return null; }
+  const n = Number(r.headers.get("content-length"));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+async function sbEnviar(bucket: string, caminho: string, bytes: Uint8Array, tipo: string) {  const r = await fetch(`${SB_URL}/storage/v1/object/${bucket}/${caminho}`, {
     method: "POST",
     headers: { ...sbAuth, "Content-Type": tipo, "x-upsert": "true" },
     body: bytes,
@@ -184,6 +197,15 @@ const SAVE_RAPIDO = { useObjectStreams: false } as const;
    dois arquivos é melhor do que nenhum e-mail. */
 const LIMITE_UNIR_PDF = 1_500_000;
 
+/* Acima deste tamanho o comprovante NÃO viaja no e-mail: vai como link.
+   Medido em produção: todo recibo com comprovante acima de 3 MB morria com
+   WORKER_RESOURCE_LIMIT — a função é morta antes de enviar, e o recibo é o
+   que destrava o pagamento. O mesmo limite de unir ao PDF serve aqui, e a
+   regra fica simples: cabe dentro do recibo, vai junto; não cabe, vira link.
+   O arquivo continua guardado no Storage e visível no painel. */
+const LIMITE_ANEXO = LIMITE_UNIR_PDF;
+const VALIDADE_LINK = 60 * 60 * 24 * 90; // 90 dias
+
 /* ---------- Anexa um comprovante em PDF como páginas do recibo ----------
    Usado só quando o comprovante é PDF (imagens vão dentro do modelo). */
 async function anexarPdf(reciboPdf: Uint8Array, anexoPdf: Uint8Array): Promise<Uint8Array> {
@@ -311,7 +333,7 @@ function secao(titulo: string, linhas: string): string {
   </td></tr>`;
 }
 
-function montarEmailHtml(record: any, opts: { anexoSeparado: boolean }): string {
+function montarEmailHtml(record: any, opts: { anexoSeparado: boolean; link?: string; linkMb?: number }): string {
   const dados = record?.dados || {};
   const campo = (k: string) => {
     const v = dados[k];
@@ -347,11 +369,27 @@ function montarEmailHtml(record: any, opts: { anexoSeparado: boolean }): string 
       linhaDetalhe("E-mail", record.preenchido_por_email || "")
     : "";
 
+  // Bloco de anexos. Com link, o comprovante ganha um botão próprio: ele
+  // não viaja no e-mail porque o peso derrubava o envio inteiro.
   const notaAnexo = record.formulario !== "reembolso"
     ? "O recibo segue em anexo, em PDF."
-    : opts.anexoSeparado
-      ? "O recibo segue em anexo, em PDF. O comprovante vai como segundo anexo — é grande demais para ser unido ao recibo."
-      : "O recibo segue em anexo, em PDF, já com o comprovante incluído no mesmo arquivo.";
+    : opts.link
+      ? "O recibo segue em anexo, em PDF."
+      : opts.anexoSeparado
+        ? "O recibo segue em anexo, em PDF. O comprovante vai como segundo anexo — é grande demais para ser unido ao recibo."
+        : "O recibo segue em anexo, em PDF, já com o comprovante incluído no mesmo arquivo.";
+
+  const blocoLink = opts.link
+    ? `<table role="presentation" width="100%" style="border-collapse:collapse;margin-top:10px;background:#f4f8fa;border-left:3px solid #308ead;border-radius:6px">
+      <tr><td style="padding:14px 16px;font-size:14px;color:#1c2530;line-height:1.5">
+        🔗 O comprovante${opts.linkMb ? ` (${opts.linkMb.toFixed(1)} MB)` : ""} é grande demais para ir anexado e está disponível para download:
+        <div style="margin-top:12px">
+          <a href="${escHtml(opts.link)}" style="display:inline-block;background:#004e6b;color:#ffffff;font-size:14px;font-weight:bold;text-decoration:none;padding:11px 20px;border-radius:6px">Baixar comprovante</a>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:#5c6b78">O link vale por 90 dias. Depois disso, o arquivo continua no painel da solicitação.</div>
+      </td></tr>
+    </table>`
+    : "";
 
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
@@ -395,6 +433,7 @@ function montarEmailHtml(record: any, opts: { anexoSeparado: boolean }): string 
     <table role="presentation" width="100%" style="border-collapse:collapse;background:#f4f8fa;border-left:3px solid #308ead;border-radius:6px">
       <tr><td style="padding:14px 16px;font-size:14px;color:#1c2530;line-height:1.5">📎 ${escHtml(notaAnexo)}</td></tr>
     </table>
+    ${blocoLink}
   </td></tr>
 
   <!-- Rodapé -->
@@ -560,18 +599,35 @@ Deno.serve(async (req) => {
     marco("modelo copiado no Drive");
 
 
-    // 2. Reembolso: baixa o comprovante antes, para saber se é imagem ou PDF
+    // 2. Reembolso: decide pelo TAMANHO antes de baixar. Comprovante grande
+    //    não é baixado nem anexado — vai como link assinado no e-mail.
     const MARCADOR = "@@COMPROVANTE@@";
     let compBytes: Uint8Array | null = null;
     let compCaminho = "";
+    let compLink = "";
+    let compMb = 0;
     if (record.formulario === "reembolso") {
       const caminho = record.dados?.["Anexar Comprovante/Recibo"];
       if (caminho && !/\s/.test(caminho)) {
+        const comoLink = async (tamanho: number) => {
+          compLink = (await sbUrlAssinada("comprovantes", caminho, VALIDADE_LINK)) || "";
+          compCaminho = caminho;
+          compMb = tamanho / 1048576;
+          marco(`comprovante de ${compMb.toFixed(2)} MB: link em vez de anexo`);
+        };
         try {
-          const bytes = await sbBaixar("comprovantes", caminho);
-          if (bytes) { compBytes = bytes; compCaminho = caminho; }
+          const tamanho = await sbTamanho("comprovantes", caminho);
+          if (tamanho !== null && tamanho > LIMITE_ANEXO) {
+            await comoLink(tamanho);
+          } else {
+            // Tamanho desconhecido (HEAD falhou) também passa por aqui: o
+            // segundo teste, já com os bytes, é a rede de segurança.
+            const bytes = await sbBaixar("comprovantes", caminho);
+            if (bytes && bytes.length > LIMITE_ANEXO) await comoLink(bytes.length);
+            else if (bytes) { compBytes = bytes; compCaminho = caminho; }
+          }
         } catch (e) {
-          console.error("download do comprovante falhou:", e);
+          console.error("comprovante indisponível:", e);
         }
       }
     }
@@ -713,7 +769,11 @@ Deno.serve(async (req) => {
     });
     const codigo = codigoRecibo(record);
     const rotuloForm = ROTULO_FORM[record.formulario] || record.formulario;
-    const html = montarEmailHtml(record, { anexoSeparado: !!anexoSeparado });
+    const html = montarEmailHtml(record, {
+      anexoSeparado: !!anexoSeparado,
+      link: compLink || undefined,
+      linkMb: compMb || undefined,
+    });
     // Assunto em ASCII puro: acentos/traços longos em cabeçalho (RFC 2047) podem
     // corromper o MIME em alguns clientes (era o caso das Diárias). O texto
     // bonito com acentos fica no corpo HTML, que é codificado corretamente.
