@@ -333,6 +333,16 @@ function secao(titulo: string, linhas: string): string {
   </td></tr>`;
 }
 
+/* Tira espaço no fim das linhas e linhas só de espaço.
+   O e-mail viaja em quoted-printable, onde espaço no fim de linha PRECISA
+   ser codificado — e aparecia como um "=20" solto no meio da mensagem. A
+   origem era a indentação deixada por uma seção vazia: quando a solicitação
+   não é preenchida por terceiro, o trecho some e sobram dois espaços
+   sozinhos numa linha. Nada disso tem valor em HTML, então sai antes de
+   montar a mensagem. */
+const limparHtml = (h: string) =>
+  h.split("\n").map((l) => l.replace(/[ \t]+$/, "")).filter((l) => l !== "").join("\n");
+
 function montarEmailHtml(record: any, opts: { anexoSeparado: boolean; link?: string; linkMb?: number }): string {
   const dados = record?.dados || {};
   const campo = (k: string) => {
@@ -391,7 +401,7 @@ function montarEmailHtml(record: any, opts: { anexoSeparado: boolean; link?: str
     </table>`
     : "";
 
-  return `<!doctype html>
+  const bruto = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Recibo ${escHtml(codigo)}</title></head>
@@ -448,6 +458,7 @@ function montarEmailHtml(record: any, opts: { anexoSeparado: boolean; link?: str
 </table>
 </td></tr></table>
 </body></html>`;
+  return limparHtml(bruto);
 }
 
 /* ---------- Chamadas ao Google com repetição ----------
