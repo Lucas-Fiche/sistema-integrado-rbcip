@@ -739,9 +739,9 @@ textarea { min-height: 96px; resize: vertical; }
   .rota-mapa { height: 230px; }
   .rd-tabela { font-size: 0.85rem; }
   .rd-tabela th, .rd-tabela td { padding: 7px 10px; }
-  /* No celular ficam Data e Valor: o nº do dia repete a data, e as três
-     colunas não cabem nos aparelhos menores */
-  .rd-tabela .c-dia { display: none; }
+  /* No celular ficam Noite e Valor: o nº repete a ordem das datas, e as
+     três colunas não cabem nos aparelhos menores */
+  .rd-tabela .c-num { display: none; }
 }
 @media (max-width: 360px) {
   .rd-tabela th, .rd-tabela td { padding: 7px 6px; }

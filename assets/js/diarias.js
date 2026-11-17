@@ -2,7 +2,7 @@
    Formulários de diárias:
      1. Origem/Destino com autocomplete de municípios (IBGE)
      2. Mapa da rota, com marcadores e seta do deslocamento
-     3. Prévia do valor por dia do período
+     3. Prévia do valor por pernoite do período
 
    Origem e destino continuam gravados como TEXTO, no formato que o
    formulário sempre pediu ("Estado, Município"). Recibo, e-mail e
@@ -595,18 +595,21 @@
     timeZone: "UTC", weekday: "short", day: "2-digit", month: "2-digit",
   });
 
-  /* Divide o total igualmente pelos dias, em centavos. Quando a divisão
-     não é exata (R$ 1.000 em 3 dias), os centavos que sobram vão um a um
-     para os primeiros dias: a soma bate EXATAMENTE com o valor informado
-     e nenhum dia difere mais de 1 centavo dos outros. */
+  /* Divide o total igualmente pelos pernoites, em centavos. Quando a
+     divisão não é exata (R$ 1.000 em 3 noites), os centavos que sobram vão
+     um a um para as primeiras noites: a soma bate EXATAMENTE com o valor
+     informado e nenhuma noite difere mais de 1 centavo das outras. */
   function distribuir(totalCent, n) {
     const base = Math.floor(totalCent / n);
     const sobra = totalCent - base * n;
     return Array.from({ length: n }, (_, i) => base + (i < sobra ? 1 : 0));
   }
 
-  /* Prévia para a pessoa ter noção do valor por dia. Não entra nos dados
-     da solicitação: fica fora de qualquer .field. */
+  /* Prévia para a pessoa ter noção do valor por pernoite. Não entra nos
+     dados da solicitação: fica fora de qualquer .field.
+     Pernoites = data final menos data inicial: de 18 a 22/11 são 4 noites
+     (18, 19, 20 e 21). Cada linha é identificada pela data em que a noite
+     começa, como nas reservas de hotel. */
   function criarResumo(form, depoisDe) {
     const ini = form.querySelector('[name="periodo_inicial"]');
     const fim = form.querySelector('[name="periodo_final"]');
@@ -620,7 +623,7 @@
       "<h3>Resumo das diárias</h3>" +
       '<p class="rd-linha" aria-live="polite"></p>' +
       '<div class="rd-tabela-wrap"><table class="rd-tabela"><thead><tr>' +
-      '<th scope="col" class="c-dia">Dia</th><th scope="col">Data</th><th scope="col" class="num">Valor</th>' +
+      '<th scope="col" class="c-num">Nº</th><th scope="col">Noite de</th><th scope="col" class="num">Valor</th>' +
       "</tr></thead><tbody></tbody><tfoot></tfoot></table></div>" +
       '<p class="rd-nota">Prévia para conferência — o valor enviado é o total informado acima.</p>';
     depoisDe.insertAdjacentElement("afterend", box);
@@ -645,16 +648,17 @@
       const totalCent = parseInt(v.replace(/\D/g, ""), 10);
 
       const a = lerData(ini.value), b = lerData(fim.value);
-      if (a == null || b == null) { mensagem("Informe o período inicial e final para ver a distribuição por dia."); return; }
+      if (a == null || b == null) { mensagem("Informe o período inicial e final para ver a distribuição por pernoite."); return; }
       if (b < a) { mensagem("A data final está antes da inicial — confira o período."); return; }
-      const n = Math.round((b - a) / DIA) + 1;
-      if (n > 92) { mensagem(`O período tem ${n} dias. Confira as datas informadas.`); return; }
+      const n = Math.round((b - a) / DIA);
+      if (n === 0) { mensagem("Ida e volta no mesmo dia: não há pernoite para distribuir o valor."); return; }
+      if (n > 92) { mensagem(`O período tem ${n} pernoites. Confira as datas informadas.`); return; }
 
       wrapTabela.hidden = false;
       const valores = distribuir(totalCent, n);
       const exato = totalCent % n === 0;
       linha.textContent =
-        `${n} ${n === 1 ? "dia" : "dias"} · ${exato ? "" : "≈ "}${brl(Math.round(totalCent / n))} por dia`;
+        `${n} ${n === 1 ? "pernoite" : "pernoites"} · ${exato ? "" : "≈ "}${brl(Math.round(totalCent / n))} por pernoite`;
 
       tbody.innerHTML = "";
       for (let i = 0; i < n; i++) {
@@ -663,13 +667,13 @@
         const tr = document.createElement("tr");
         if (dow === 0 || dow === 6) tr.className = "rd-fds";
         tr.innerHTML =
-          `<td class="c-dia">${i + 1}</td><td>${esc(fmtDia(t))}</td>` +
+          `<td class="c-num">${i + 1}</td><td>${esc(fmtDia(t))}</td>` +
           `<td class="num">${esc(brl(valores[i]))}</td>`;
         tbody.appendChild(tr);
       }
-      // Sem colspan: a coluna Dia some no celular, e colspan desalinharia
+      // Sem colspan: a coluna Nº some no celular, e colspan desalinharia
       tfoot.innerHTML =
-        `<tr><td class="c-dia"></td><th scope="row">Total</th>` +
+        `<tr><td class="c-num"></td><th scope="row">Total</th>` +
         `<td class="num">${esc(brl(totalCent))}</td></tr>`;
     }
 
