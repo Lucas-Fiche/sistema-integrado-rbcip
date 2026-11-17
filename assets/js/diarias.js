@@ -297,23 +297,16 @@
     return _leaflet;
   }
 
-  function distanciaKm(a, b) {
-    const rad = (g) => (g * Math.PI) / 180;
-    const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
-    const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
-    return 2 * 6371 * Math.asin(Math.sqrt(h));
-  }
-
   function criarRota(depoisDe) {
     const box = document.createElement("div");
     box.className = "rota";
     box.hidden = true;
     box.innerHTML =
-      '<div class="rota-cab"><span class="rota-trecho"></span><span class="rota-dist"></span></div>' +
+      '<div class="rota-cab"><span class="rota-trecho"></span><span class="rota-nota"></span></div>' +
       '<div class="rota-mapa" role="img"></div>';
     depoisDe.insertAdjacentElement("afterend", box);
     const trecho = box.querySelector(".rota-trecho");
-    const dist = box.querySelector(".rota-dist");
+    const nota = box.querySelector(".rota-nota");
     const div = box.querySelector(".rota-mapa");
 
     let mapa = null, camada = null, enquadrar = () => {};
@@ -506,16 +499,12 @@
       const mesmo = origem && destino && origem.uf === destino.uf && origem.nome === destino.nome;
       if (origem && destino) {
         trecho.innerHTML = `<b>${esc(rotulo(origem))}</b> <span class="rota-flecha" aria-hidden="true">→</span> <b>${esc(rotulo(destino))}</b>`;
-        if (mesmo) dist.textContent = "Origem e destino são o mesmo município.";
-        else {
-          const km = distanciaKm(origem, destino);
-          dist.textContent = `≈ ${Math.round(km).toLocaleString("pt-BR")} km em linha reta`;
-        }
+        nota.textContent = mesmo ? "Origem e destino são o mesmo município." : "";
         div.setAttribute("aria-label", `Mapa da rota de ${rotulo(origem)} a ${rotulo(destino)}`);
       } else {
         const m = origem || destino;
         trecho.innerHTML = `<b>${esc(rotulo(m))}</b>`;
-        dist.textContent = origem ? "Informe o destino para ver a rota." : "Informe a origem para ver a rota.";
+        nota.textContent = origem ? "Informe o destino para ver a rota." : "Informe a origem para ver a rota.";
         div.setAttribute("aria-label", `Mapa com ${rotulo(m)}`);
       }
     }
@@ -529,7 +518,7 @@
         if (!mapa) montarMapa(L);
         desenhar(L);
       }).catch((e) => {
-        // Sem a biblioteca, fica o resumo em texto (trecho + distância)
+        // Sem a biblioteca, fica o trecho em texto no cabeçalho
         console.error("mapa da rota:", e);
         semMapa = true;
         div.hidden = true;
