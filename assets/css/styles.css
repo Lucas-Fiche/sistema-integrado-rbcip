@@ -563,3 +563,200 @@ textarea { min-height: 96px; resize: vertical; }
   opacity: 1;
   text-decoration: underline;
 }
+
+/* =============================================================
+   Diárias: autocomplete de municípios, mapa da rota e resumo
+   ============================================================= */
+
+/* ---------- Autocomplete ---------- */
+.ac { position: relative; }
+.ac input {
+  padding-left: 36px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235c6b78' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z'/%3E%3Ccircle cx='12' cy='9.5' r='2.5'/%3E%3C/svg%3E") no-repeat 12px 50% / 16px 16px;
+}
+.ac-lista {
+  position: absolute;
+  z-index: 1100;               /* acima do mapa (o Leaflet usa até 1000) */
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(16, 32, 48, 0.16), 0 2px 6px rgba(16, 32, 48, 0.08);
+  max-height: 300px;
+  overflow-y: auto;
+}
+.ac-lista li[role="option"] {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-height: 44px;            /* alvo de toque confortável */
+  padding: 10px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.ac-lista li[role="option"]:hover { background: #f3f7f9; }
+.ac-lista li[aria-selected="true"] { background: var(--brand-light); }
+.ac-cidade { font-weight: 600; color: var(--text); }
+.ac-uf { color: var(--muted); font-size: 0.88rem; }
+.ac-tag {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--cor-secundaria);
+  background: #e8f4f8;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.ac-vazio { padding: 12px; color: var(--muted); font-size: 0.9rem; }
+
+/* ---------- Mapa da rota ---------- */
+.rota {
+  margin: -6px 0 22px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.rota-cab {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 10px 14px;
+  background: #f7fafb;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.92rem;
+}
+.rota-flecha { color: var(--cor-secundaria); font-weight: 700; margin: 0 2px; }
+.rota-dist { color: var(--muted); font-size: 0.85rem; }
+.rota-mapa {
+  height: 280px;
+  isolation: isolate;          /* contém os z-index internos do Leaflet */
+  background: #e9eef1;
+}
+.rota-mapa.leaflet-container { font-family: var(--font); }
+.leaflet-tooltip.rota-rotulo {
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+}
+.leaflet-tooltip.rota-rotulo small {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--cor-primaria);
+}
+.leaflet-tooltip.rota-rotulo--destino small { color: var(--cor-roxo); }
+/* Versão curta, quando o nome por extenso não cabe (está no cabeçalho) */
+.leaflet-tooltip.rota-rotulo--curto { padding: 3px 7px; }
+.leaflet-tooltip.rota-rotulo--curto small { font-size: 0.68rem; }
+
+/* ---------- Resumo das diárias ---------- */
+.resumo-diarias {
+  margin: -6px 0 22px;
+  padding: 14px 16px;
+  background: #fbfcfd;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--cor-secundaria);
+  border-radius: 10px;
+}
+.rd-cab {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.rd-cab h3 { margin: 0; font-size: 1rem; }
+.rd-meia {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.rd-meia input { width: auto; margin: 0; }
+.rd-linha { margin: 8px 0 10px; font-size: 0.92rem; color: var(--muted); }
+.rd-linha--aviso { color: #7a5c00; margin-bottom: 0; }
+.rd-tabela-wrap {
+  max-height: 340px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.rd-tabela { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.rd-tabela th,
+.rd-tabela td {
+  padding: 8px 12px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid #edf1f4;
+}
+.rd-tabela thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f3f7f9;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rd-tabela .num { text-align: right; font-variant-numeric: tabular-nums; }
+.rd-tabela tbody tr:last-child td { border-bottom: 0; }
+.rd-tabela tfoot th,
+.rd-tabela tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: #f3f7f9;
+  font-weight: 700;
+  border-top: 1px solid var(--border);
+  border-bottom: 0;
+}
+/* Fim de semana: só um fundo discreto. Texto cinza parecia valor
+   desabilitado — e apagava justamente a linha da meia diária. */
+.rd-fds td { background: #f8fafb; }
+.rd-meia-tag {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #7a5c00;
+  background: #fff3d6;
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+.rd-nota { margin: 8px 0 0; font-size: 0.8rem; color: var(--muted); }
+.rd-so-cel { display: none; }
+
+@media (max-width: 600px) {
+  .rota-mapa { height: 230px; }
+  .rd-tabela { font-size: 0.85rem; }
+  .rd-tabela th, .rd-tabela td { padding: 7px 10px; }
+  /* Quatro colunas não cabem: ficam Data e Valor. O nº do dia repete a
+     data, e o total de diárias já está na linha de resumo. */
+  .rd-tabela .c-dia,
+  .rd-tabela .c-tipo { display: none; }
+  .rd-so-cel { display: block; width: fit-content; margin-top: 3px; }
+}
+@media (max-width: 360px) {
+  .rd-tabela th, .rd-tabela td { padding: 7px 6px; }
+}

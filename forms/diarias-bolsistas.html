@@ -54,17 +54,17 @@
         <section class="form-section">
           <h2 class="section-title"><span class="num">3</span>Detalhes da Despesa</h2>
 
-          <div class="field" data-label="Origem (Estado e Município)">
+          <div class="field" data-label="Origem (Estado e Município)" data-validate="municipio">
             <label>Origem (Estado e Município) <span class="req">*</span></label>
-            <span class="hint">USE O FORMATO: Maranhão, São Luis</span>
-            <input type="text" name="origem" placeholder="Maranhão, São Luis" required />
+            <span class="hint">Digite o nome da cidade e escolha na lista.</span>
+            <input type="text" name="origem" placeholder="Ex.: São Luís" required />
             <span class="error"></span>
           </div>
 
-          <div class="field" data-label="Destino (Estado e Município)">
+          <div class="field" data-label="Destino (Estado e Município)" data-validate="municipio">
             <label>Destino (Estado e Município) <span class="req">*</span></label>
-            <span class="hint">USE O FORMATO: Maranhão, Codó</span>
-            <input type="text" name="destino" placeholder="Maranhão, Codó" required />
+            <span class="hint">Digite o nome da cidade e escolha na lista.</span>
+            <input type="text" name="destino" placeholder="Ex.: Codó" required />
             <span class="error"></span>
           </div>
 
@@ -120,9 +120,11 @@
   <script src="../assets/js/supabase.js"></script>
   <script src="../assets/js/auth.js"></script>
   <script src="../assets/js/app.js"></script>
+  <script src="../assets/js/diarias.js"></script>
   <script>
     montarSecaoColaborador({ nome: "texto", projeto: true });
     ativarFormulario({ id: "diarias-bolsistas", titulo: "Formulário de Solicitação de Diárias para Bolsistas", requerLogin: true });
+    ativarDiarias({ id: "diarias-bolsistas" });
   </script>
 </body>
 </html>

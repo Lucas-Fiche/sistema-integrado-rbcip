@@ -94,6 +94,12 @@ function validarCampo(field, form) {
     if (!m) { setError(field, "Use o formato SSP/DF."); return false; }
     if (!UFS.has(m[2].toUpperCase())) { setError(field, "UF inválida (use a sigla do estado, ex.: DF, SP, MG)."); return false; }
   }
+  // Origem/Destino das diárias: precisa vir da lista de municípios
+  // (diarias.js). Se a lista não carregar, municipioLivre aceita o texto
+  // — melhor um texto a conferir do que uma solicitação travada.
+  if (tipoCampo === "municipio" && !first.dataset.municipio && !first.dataset.municipioLivre) {
+    setError(field, first.dataset.municipioErro || "Escolha a cidade na lista de sugestões."); return false;
+  }
   if (first.name === "periodo_final") {
     const ini = form.querySelector('[name="periodo_inicial"]');
     if (ini && ini.value && value < ini.value) {
