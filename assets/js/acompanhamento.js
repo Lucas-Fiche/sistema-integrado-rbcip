@@ -5,8 +5,8 @@
 const FORM_LABEL = {
   pagamentos: "Pagamento",
   reembolso: "Reembolso",
-  "diarias-colaboradores": "Diárias — Colaboradores",
-  "diarias-bolsistas": "Diárias — Bolsistas",
+  "diarias-colaboradores": "Diárias para Colaboradores",
+  "diarias-bolsistas": "Diárias para Bolsistas",
 };
 const STATUS_LABEL = {
   pendente: "Pendente", em_analise: "Em análise", aprovado: "Aprovado",

@@ -13,15 +13,15 @@ const STATUS_LABEL = {
 const FORM_LABEL = {
   pagamentos: "Pagamento",
   reembolso: "Reembolso",
-  "diarias-colaboradores": "Diárias — Colaboradores",
-  "diarias-bolsistas": "Diárias — Bolsistas",
+  "diarias-colaboradores": "Diárias para Colaboradores",
+  "diarias-bolsistas": "Diárias para Bolsistas",
 };
 
 const ABAS = [
   { id: "pagamentos", label: "Pagamento" },
   { id: "reembolso", label: "Reembolso" },
-  { id: "diarias-colaboradores", label: "Diárias — Colaboradores" },
-  { id: "diarias-bolsistas", label: "Diárias — Bolsistas" },
+  { id: "diarias-colaboradores", label: "Diárias para Colaboradores" },
+  { id: "diarias-bolsistas", label: "Diárias para Bolsistas" },
 ];
 
 let TODAS = [];

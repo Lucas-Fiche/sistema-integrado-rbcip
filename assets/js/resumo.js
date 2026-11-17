@@ -13,8 +13,8 @@
   const TITULOS = {
     pagamentos: "Pagamento",
     reembolso: "Reembolso",
-    "diarias-colaboradores": "Diárias — Colaboradores",
-    "diarias-bolsistas": "Diárias — Bolsistas",
+    "diarias-colaboradores": "Diárias para Colaboradores",
+    "diarias-bolsistas": "Diárias para Bolsistas",
   };
 
   const DIA = 86400000;

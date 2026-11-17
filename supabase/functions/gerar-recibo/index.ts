@@ -272,8 +272,8 @@ const LOGO_URL = "https://solicitacoes.rbcip.org/assets/img/logo.png";
 const ROTULO_FORM: Record<string, string> = {
   pagamentos: "Pagamento",
   reembolso: "Reembolso",
-  "diarias-colaboradores": "Diárias — Colaboradores",
-  "diarias-bolsistas": "Diárias — Bolsistas",
+  "diarias-colaboradores": "Diárias para Colaboradores",
+  "diarias-bolsistas": "Diárias para Bolsistas",
 };
 
 /* Campos de detalhe por formulário, na ordem em que aparecem no e-mail.
