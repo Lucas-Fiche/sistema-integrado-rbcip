@@ -644,6 +644,9 @@ textarea { min-height: 96px; resize: vertical; }
   background: #e9eef1;
 }
 .rota-mapa.leaflet-container { font-family: var(--font); }
+/* O mapa do OSM é muito colorido; atenuar só o fundo deixa a rota
+   (marcadores, seta e rótulos ficam em outras camadas) em destaque. */
+.rota-mapa .leaflet-tile-pane { filter: saturate(0.5) brightness(1.03); }
 .leaflet-tooltip.rota-rotulo {
   font-family: var(--font);
   font-size: 0.8rem;

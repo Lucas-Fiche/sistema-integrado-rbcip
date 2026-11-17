@@ -326,11 +326,12 @@
         dragging: !L.Browser.mobile,     // no celular, um dedo rola a página
         zoomSnap: 0.25,
       });
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        subdomains: "abcd",
+      // Mosaicos do próprio OpenStreetMap: dispensam chave de API. A política
+      // de uso aceita sites de baixo volume que exibem o crédito abaixo.
+      // (O CARTO, usado antes, passou a exigir chave.)
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> ' +
-          '&copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
       }).addTo(mapa);
       camada = L.layerGroup().addTo(mapa);
       // Vista inicial obrigatória: sem ela o Leaflet adia a criação das
