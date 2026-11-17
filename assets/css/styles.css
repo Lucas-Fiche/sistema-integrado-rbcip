@@ -677,22 +677,7 @@ textarea { min-height: 96px; resize: vertical; }
   border-left: 3px solid var(--cor-secundaria);
   border-radius: 10px;
 }
-.rd-cab {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-}
-.rd-cab h3 { margin: 0; font-size: 1rem; }
-.rd-meia {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.88rem;
-  cursor: pointer;
-}
-.rd-meia input { width: auto; margin: 0; }
+.resumo-diarias h3 { margin: 0; font-size: 1rem; }
 .rd-linha { margin: 8px 0 10px; font-size: 0.92rem; color: var(--muted); }
 .rd-linha--aviso { color: #7a5c00; margin-bottom: 0; }
 .rd-tabela-wrap {
@@ -732,30 +717,17 @@ textarea { min-height: 96px; resize: vertical; }
   border-top: 1px solid var(--border);
   border-bottom: 0;
 }
-/* Fim de semana: só um fundo discreto. Texto cinza parecia valor
-   desabilitado — e apagava justamente a linha da meia diária. */
+/* Fim de semana: só um fundo discreto (texto cinza parecia desabilitado) */
 .rd-fds td { background: #f8fafb; }
-.rd-meia-tag {
-  display: inline-block;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #7a5c00;
-  background: #fff3d6;
-  padding: 1px 8px;
-  border-radius: 999px;
-}
 .rd-nota { margin: 8px 0 0; font-size: 0.8rem; color: var(--muted); }
-.rd-so-cel { display: none; }
 
 @media (max-width: 600px) {
   .rota-mapa { height: 230px; }
   .rd-tabela { font-size: 0.85rem; }
   .rd-tabela th, .rd-tabela td { padding: 7px 10px; }
-  /* Quatro colunas não cabem: ficam Data e Valor. O nº do dia repete a
-     data, e o total de diárias já está na linha de resumo. */
-  .rd-tabela .c-dia,
-  .rd-tabela .c-tipo { display: none; }
-  .rd-so-cel { display: block; width: fit-content; margin-top: 3px; }
+  /* No celular ficam Data e Valor: o nº do dia repete a data, e as três
+     colunas não cabem nos aparelhos menores */
+  .rd-tabela .c-dia { display: none; }
 }
 @media (max-width: 360px) {
   .rd-tabela th, .rd-tabela td { padding: 7px 6px; }

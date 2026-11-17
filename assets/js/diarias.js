@@ -2,7 +2,7 @@
    Formulários de diárias:
      1. Origem/Destino com autocomplete de municípios (IBGE)
      2. Mapa da rota, com marcadores e seta do deslocamento
-     3. Resumo da distribuição do valor pelos dias do período
+     3. Prévia do valor por dia do período
 
    Origem e destino continuam gravados como TEXTO, no formato que o
    formulário sempre pediu ("Estado, Município"). Recibo, e-mail e
@@ -543,8 +543,6 @@
 
   /* ---------- resumo da distribuição das diárias ---------- */
   const brl = (cent) => (cent / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  const fmtDiarias = (n) => n === 0.5 ? "meia diária"
-    : `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ${n === 1 ? "diária" : "diárias"}`;
 
   // "2026-11-18" é data de calendário: trata em UTC para não voltar um
   // dia na conversão de fuso (o mesmo cuidado do recibo).
@@ -559,21 +557,19 @@
     timeZone: "UTC", weekday: "short", day: "2-digit", month: "2-digit",
   });
 
-  /* Divide o total pelos dias, em centavos. Dia inteiro pesa 2, meia
-     diária pesa 1. Os centavos que sobram da divisão vão para os dias
-     com maior fração (maiores restos), então a soma bate EXATAMENTE com
-     o valor informado e nenhum dia difere mais de 1 centavo do exato. */
-  function distribuir(totalCent, n, meiaNoUltimo) {
-    const pesos = Array.from({ length: n }, (_, i) => (meiaNoUltimo && i === n - 1 ? 1 : 2));
-    const soma = pesos.reduce((a, b) => a + b, 0);
-    const valores = pesos.map((w) => Math.floor((totalCent * w) / soma));
-    let falta = totalCent - valores.reduce((a, b) => a + b, 0);
-    const ordem = pesos.map((w, i) => [(totalCent * w) % soma, i]).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
-    for (let k = 0; falta > 0; k = (k + 1) % n, falta--) valores[ordem[k][1]]++;
-    return { pesos, valores, diarias: soma / 2, diariaCent: (totalCent * 2) / soma };
+  /* Divide o total igualmente pelos dias, em centavos. Quando a divisão
+     não é exata (R$ 1.000 em 3 dias), os centavos que sobram vão um a um
+     para os primeiros dias: a soma bate EXATAMENTE com o valor informado
+     e nenhum dia difere mais de 1 centavo dos outros. */
+  function distribuir(totalCent, n) {
+    const base = Math.floor(totalCent / n);
+    const sobra = totalCent - base * n;
+    return Array.from({ length: n }, (_, i) => base + (i < sobra ? 1 : 0));
   }
 
-  function criarResumo(form, depoisDe, chaveRascunho) {
+  /* Prévia para a pessoa ter noção do valor por dia. Não entra nos dados
+     da solicitação: fica fora de qualquer .field. */
+  function criarResumo(form, depoisDe) {
     const ini = form.querySelector('[name="periodo_inicial"]');
     const fim = form.querySelector('[name="periodo_final"]');
     const valor = form.querySelector('[name="valor"]');
@@ -583,40 +579,23 @@
     box.className = "resumo-diarias";
     box.hidden = true;
     box.innerHTML =
-      '<div class="rd-cab"><h3>Resumo das diárias</h3>' +
-      '<label class="rd-meia"><input type="checkbox" name="meia_diaria_ultimo_dia" /> ' +
-      'Último dia (retorno) é meia diária</label></div>' +
+      "<h3>Resumo das diárias</h3>" +
       '<p class="rd-linha" aria-live="polite"></p>' +
       '<div class="rd-tabela-wrap"><table class="rd-tabela"><thead><tr>' +
-      '<th scope="col" class="c-dia">Dia</th><th scope="col">Data</th>' +
-      '<th scope="col" class="c-tipo">Diária</th><th scope="col" class="num">Valor</th>' +
+      '<th scope="col" class="c-dia">Dia</th><th scope="col">Data</th><th scope="col" class="num">Valor</th>' +
       "</tr></thead><tbody></tbody><tfoot></tfoot></table></div>" +
       '<p class="rd-nota">Prévia para conferência — o valor enviado é o total informado acima.</p>';
     depoisDe.insertAdjacentElement("afterend", box);
 
-    // Fica FORA de qualquer .field: não entra nos dados da solicitação
-    // nem na validação; só o rascunho lembra a escolha.
-    const meia = box.querySelector('[name="meia_diaria_ultimo_dia"]');
     const linha = box.querySelector(".rd-linha");
     const wrapTabela = box.querySelector(".rd-tabela-wrap");
     const tbody = box.querySelector("tbody");
     const tfoot = box.querySelector("tfoot");
-    const cab = box.querySelector(".rd-meia");
-
-    // O rascunho é restaurado pelo app.js ANTES desta caixa existir; a
-    // marcação da meia diária é recuperada aqui.
-    if (chaveRascunho) {
-      try {
-        const d = JSON.parse(localStorage.getItem(chaveRascunho) || "null");
-        if (d && Array.isArray(d.meia_diaria_ultimo_dia)) meia.checked = true;
-      } catch (_) { /* rascunho indisponível: segue desmarcado */ }
-    }
 
     function mensagem(texto) {
       linha.textContent = texto;
       linha.classList.add("rd-linha--aviso");
       wrapTabela.hidden = true;
-      cab.hidden = true;
     }
 
     function atualizar() {
@@ -633,13 +612,11 @@
       const n = Math.round((b - a) / DIA) + 1;
       if (n > 92) { mensagem(`O período tem ${n} dias. Confira as datas informadas.`); return; }
 
-      cab.hidden = false;
       wrapTabela.hidden = false;
-      const r = distribuir(totalCent, n, meia.checked);
-      const exato = Number.isInteger(r.diariaCent);
+      const valores = distribuir(totalCent, n);
+      const exato = totalCent % n === 0;
       linha.textContent =
-        `${n} ${n === 1 ? "dia" : "dias"} · ${fmtDiarias(r.diarias)} · ` +
-        `diária de ${exato ? "" : "≈ "}${brl(Math.round(r.diariaCent))}`;
+        `${n} ${n === 1 ? "dia" : "dias"} · ${exato ? "" : "≈ "}${brl(Math.round(totalCent / n))} por dia`;
 
       tbody.innerHTML = "";
       for (let i = 0; i < n; i++) {
@@ -647,24 +624,18 @@
         const dow = new Date(t).getUTCDay();
         const tr = document.createElement("tr");
         if (dow === 0 || dow === 6) tr.className = "rd-fds";
-        const meiaDia = r.pesos[i] === 1;
-        // No celular as colunas Dia e Diária somem (não cabem); a marcação
-        // de meia diária desce para dentro da célula da data.
         tr.innerHTML =
-          `<td class="c-dia">${i + 1}</td>` +
-          `<td>${esc(fmtDia(t))}${meiaDia ? '<span class="rd-meia-tag rd-so-cel">Meia diária</span>' : ""}</td>` +
-          `<td class="c-tipo">${meiaDia ? '<span class="rd-meia-tag">Meia (retorno)</span>' : "Integral"}</td>` +
-          `<td class="num">${esc(brl(r.valores[i]))}</td>`;
+          `<td class="c-dia">${i + 1}</td><td>${esc(fmtDia(t))}</td>` +
+          `<td class="num">${esc(brl(valores[i]))}</td>`;
         tbody.appendChild(tr);
       }
-      // Sem colspan: com colunas ocultas no celular, colspan desalinharia
+      // Sem colspan: a coluna Dia some no celular, e colspan desalinharia
       tfoot.innerHTML =
         `<tr><td class="c-dia"></td><th scope="row">Total</th>` +
-        `<td class="c-tipo">${esc(fmtDiarias(r.diarias))}</td>` +
         `<td class="num">${esc(brl(totalCent))}</td></tr>`;
     }
 
-    [ini, fim, valor, meia].forEach((el) => {
+    [ini, fim, valor].forEach((el) => {
       el.addEventListener("input", atualizar);
       el.addEventListener("change", atualizar);
     });
@@ -672,7 +643,7 @@
   }
 
   /* ---------- ponto de entrada ---------- */
-  window.ativarDiarias = function (config) {
+  window.ativarDiarias = function () {
     const form = document.getElementById("form");
     if (!form) return;
     const inOrigem = form.querySelector('[name="origem"]');
@@ -695,8 +666,7 @@
     }
 
     const campoValor = form.querySelector('[name="valor"]');
-    const chave = config && config.id ? "rbcip_draft_" + config.id : null; // mesma chave do app.js
-    const resumo = criarResumo(form, campoValor ? campoValor.closest(".field") : form.lastElementChild, chave);
+    const resumo = criarResumo(form, campoValor ? campoValor.closest(".field") : form.lastElementChild);
     resumo.atualizar(); // rascunho restaurado
 
     // "Limpar": o reset nativo só zera os campos; o resto acompanha
