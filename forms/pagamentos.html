@@ -10,22 +10,32 @@
   <link rel="stylesheet" href="../assets/css/styles.css" />
 </head>
 <body>
-  <header class="brand-bar brand-bar--centro">
-    <img class="brand-bar__logo" src="../assets/img/logo.png"
-         alt="RBCIP — pesquisa e inovação"
-         onerror="this.style.display='none';
-                  this.parentNode.querySelector('.brand-bar__texto').style.display='inline-flex';" />
-    <span class="brand-bar__texto">RBCIP <small>pesquisa e inovação</small></span>
+  <header class="brand-bar">
+    <div class="brand-bar__inner">
+      <img class="brand-bar__logo" src="../assets/img/logo.png"
+           alt="RBCIP — pesquisa e inovação"
+           onerror="this.style.display='none';
+                    this.parentNode.querySelector('.brand-bar__texto').style.display='inline-flex';" />
+      <span class="brand-bar__texto">RBCIP <small>pesquisa e inovação</small></span>
+      <span class="brand-bar__divisor" aria-hidden="true"></span>
+      <span class="brand-bar__sistema">Sistema de Solicitações</span>
+    </div>
   </header>
 
-  <nav class="topbar">
-    <a class="back-link" href="../index.html">← Voltar aos formulários</a>
-  </nav>
-
-  <main class="container">
-    <div class="form-card">
+  <section class="hero">
+    <div class="hero__inner">
+      <nav class="topbar">
+        <a class="back-link" href="../index.html">← Voltar aos formulários</a>
+      </nav>
+      <span class="hero__pilula">Pagamento</span>
       <h1>Formulário de Pagamento</h1>
+      <p class="hero__sub">Solicitação de pagamento por serviço prestado, com dados do colaborador e valor.</p>
       <p class="required-note">* Indica uma pergunta obrigatória</p>
+    </div>
+  </section>
+
+  <main class="container container--form">
+    <div class="form-card">
 
       <form id="form" novalidate>
         <!-- Seção 1 – Dados do Colaborador (bloco compartilhado) -->
@@ -70,16 +80,18 @@
     </div>
   </main>
 
-  <footer class="site-footer">Sistema de Solicitações - RBCIP · v1.3</footer>
+  <footer class="site-footer">Sistema de Solicitações - RBCIP · v1.4</footer>
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/data.js"></script>
   <script src="../assets/js/components.js"></script>
   <script src="../assets/js/supabase.js"></script>
   <script src="../assets/js/app.js"></script>
+  <script src="../assets/js/resumo.js"></script>
   <script>
     montarSecaoColaborador({ nome: "texto", opcionais: ["email", "rg", "orgao_uf"] });
     ativarFormulario({ id: "pagamentos", titulo: "Formulário de Pagamento" });
+    ativarResumo({ id: "pagamentos" });
   </script>
 </body>
 </html>

@@ -11,12 +11,16 @@
   <link rel="stylesheet" href="../assets/css/admin.css" />
 </head>
 <body>
-  <header class="brand-bar brand-bar--centro">
-    <img class="brand-bar__logo" src="../assets/img/logo.png"
-         alt="RBCIP — pesquisa e inovação"
-         onerror="this.style.display='none';
-                  this.parentNode.querySelector('.brand-bar__texto').style.display='inline-flex';" />
-    <span class="brand-bar__texto">RBCIP <small>pesquisa e inovação</small></span>
+  <header class="brand-bar">
+    <div class="brand-bar__inner">
+      <img class="brand-bar__logo" src="../assets/img/logo.png"
+           alt="RBCIP — pesquisa e inovação"
+           onerror="this.style.display='none';
+                    this.parentNode.querySelector('.brand-bar__texto').style.display='inline-flex';" />
+      <span class="brand-bar__texto">RBCIP <small>pesquisa e inovação</small></span>
+      <span class="brand-bar__divisor" aria-hidden="true"></span>
+      <span class="brand-bar__sistema">Sistema de Solicitações</span>
+    </div>
   </header>
 
   <div class="admin-wrap">
@@ -29,7 +33,7 @@
     </div>
   </div>
 
-  <footer class="site-footer">Sistema de Solicitações - RBCIP · v1.3</footer>
+  <footer class="site-footer">Sistema de Solicitações - RBCIP · v1.4</footer>
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/supabase.js"></script>

@@ -19,7 +19,7 @@
   const URL_LEAFLET_JS = new URL("../vendor/leaflet/leaflet.js", SCRIPT).href;
   const URL_LEAFLET_CSS = new URL("../vendor/leaflet/leaflet.css", SCRIPT).href;
 
-  const COR = { primaria: "#004e6b", roxo: "#2f166e" };
+  const COR = { primaria: "#1f668d", roxo: "#30256a" }; // paleta do site RBCIP
 
   /* ---------- utilidades ---------- */
   const norm = (s) => String(s || "")

@@ -115,8 +115,14 @@ async function rbcipBarraUsuario() {
   const barra = document.createElement("div");
   barra.className = "user-bar";
   const nome = dados?.nome || "Colaborador(a)";
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  // Iniciais do primeiro e do último nome, para o avatar
+  const partes = nome.trim().split(/\s+/);
+  const iniciais = (partes[0][0] + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase();
   barra.innerHTML =
-    `<span>👤 ${nome}</span>` +
+    `<span class="user-bar__quem"><span class="user-bar__avatar" aria-hidden="true">${esc(iniciais)}</span>` +
+    `<span class="user-bar__texto"><small>Conectado como</small><b>${esc(nome)}</b></span></span>` +
     `<button type="button" class="link-sair">Sair</button>`;
   card.insertBefore(barra, card.firstChild);
   barra.querySelector(".link-sair").onclick = () => window.rbcipAuth.sair();
@@ -129,7 +135,7 @@ function rbcipRenderLogin(form, config) {
   painel.className = "login-panel";
   painel.innerHTML = `
     <div class="login-head">
-      <div class="login-icon">🔒</div>
+      <div class="login-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg></div>
       <h2>Acesso restrito</h2>
       <p>Informe seu CPF para receber um código de acesso por e-mail.</p>
     </div>
