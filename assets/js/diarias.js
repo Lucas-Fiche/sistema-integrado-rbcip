@@ -328,63 +328,110 @@
       }).addTo(mapa);
       camada = L.layerGroup().addTo(mapa);
       // Vista inicial obrigatória: sem ela o Leaflet adia a criação das
-      // linhas, e a ponta de seta não teria onde ser aplicada.
+      // camadas, e o avião nasceria sem elemento para girar.
       mapa.setView([-14.2, -51.9], 4, { animate: false });
       // O formulário pode começar oculto (tela de login) e o mapa nasce
       // sem tamanho; recalcula sempre que a área muda.
       if (window.ResizeObserver) {
         new ResizeObserver(() => { mapa.invalidateSize(); enquadrar(); }).observe(div);
       }
+      // Animação só enquanto o mapa está na tela: fora dela, nada roda
+      // (poupa bateria no celular).
+      if (window.IntersectionObserver) {
+        new IntersectionObserver(([e]) => {
+          emTela = e.isIntersecting;
+          if (emTela) rodarVoo(); else pararVoo();
+        }).observe(div);
+      }
     }
 
     // Arco suave entre os pontos (curva de Bézier no plano do mapa) —
-    // separa visualmente a rota de estradas e rios do fundo.
-    function arco(L, a, b) {
+    // separa visualmente a rota de estradas e rios do fundo. Devolve os
+    // pontos da linha e, para o avião, a posição e a direção em cada t.
+    function curva(L, a, b) {
       const z = 8;
       const pa = mapa.project([a.lat, a.lng], z), pb = mapa.project([b.lat, b.lng], z);
       const dx = pb.x - pa.x, dy = pb.y - pa.y, d = Math.hypot(dx, dy);
       let nx = -dy / d, ny = dx / d;
       if (ny > 0) { nx = -nx; ny = -ny; }               // curva sempre para cima
       const c = L.point((pa.x + pb.x) / 2 + nx * d * 0.2, (pa.y + pb.y) / 2 + ny * d * 0.2);
-      const pts = [];
-      for (let i = 0; i <= 48; i++) {
-        const t = i / 48, u = 1 - t;
-        pts.push(mapa.unproject(L.point(
+      const ponto = (t) => {
+        const u = 1 - t;
+        return mapa.unproject(L.point(
           u * u * pa.x + 2 * u * t * c.x + t * t * pb.x,
-          u * u * pa.y + 2 * u * t * c.y + t * t * pb.y), z));
-      }
-      return pts;
+          u * u * pa.y + 2 * u * t * c.y + t * t * pb.y), z);
+      };
+      // Direção = derivada da curva. No plano do mapa o ângulo não muda
+      // com o zoom, então serve em qualquer aproximação.
+      const angulo = (t) => {
+        const tx = 2 * (1 - t) * (c.x - pa.x) + 2 * t * (pb.x - c.x);
+        const ty = 2 * (1 - t) * (c.y - pa.y) + 2 * t * (pb.y - c.y);
+        return (Math.atan2(ty, tx) * 180) / Math.PI;
+      };
+      const pts = [];
+      for (let i = 0; i <= 48; i++) pts.push(ponto(i / 48));
+      return { pts, ponto, angulo };
     }
 
-    // Ponta de seta como marcador SVG nativo: acompanha a direção da linha
-    // em qualquer zoom, sem recálculo.
-    function aplicarSeta(linha) {
-      const path = linha.getElement();
-      const svg = path && path.ownerSVGElement;
-      if (!svg) return;
-      if (!svg.querySelector("#rbcip-seta")) {
-        const NS = "http://www.w3.org/2000/svg";
-        const defs = document.createElementNS(NS, "defs");
-        const mk = document.createElementNS(NS, "marker");
-        mk.setAttribute("id", "rbcip-seta");
-        mk.setAttribute("viewBox", "0 0 12 12");
-        mk.setAttribute("refX", "21");   // ponta para antes do marcador de destino
-        mk.setAttribute("refY", "6");
-        mk.setAttribute("markerWidth", "12");
-        mk.setAttribute("markerHeight", "12");
-        mk.setAttribute("markerUnits", "userSpaceOnUse");
-        mk.setAttribute("orient", "auto");
-        const p = document.createElementNS(NS, "path");
-        p.setAttribute("d", "M0,0 L12,6 L0,12 L3,6 Z");
-        p.setAttribute("fill", COR.primaria);
-        mk.appendChild(p);
-        defs.appendChild(mk);
-        svg.insertBefore(defs, svg.firstChild);
-      }
-      path.setAttribute("marker-end", "url(#rbcip-seta)");
+    /* ---------- avião: percorre o arco da origem ao destino ----------
+       Ícone "flight" do Material Design (Apache 2.0), com o nariz para
+       cima — daí o +90° na rotação. */
+    const SVG_AVIAO =
+      '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">' +
+      '<path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>' +
+      "</svg>";
+    const VOO_MS = 3400;     // duração da travessia
+    const PAUSA_MS = 800;    // intervalo antes de decolar de novo
+    let voo = null;          // { curva, marcador, svg, quadro }
+    let emTela = true;
+
+    function pararVoo() {
+      if (voo && voo.quadro) cancelAnimationFrame(voo.quadro);
+      if (voo) voo.quadro = null;
+    }
+
+    function posicionarAviao(t, opacidade) {
+      voo.marcador.setLatLng(voo.curva.ponto(t));
+      voo.svg.style.transform = `rotate(${voo.curva.angulo(t) + 90}deg)`;
+      voo.marcador.setOpacity(opacidade);
+    }
+
+    function rodarVoo() {
+      if (!voo || voo.quadro || voo.estatico || !emTela) return;
+      let inicio = null;
+      const quadro = (agora) => {
+        if (inicio === null) inicio = agora;
+        const decorrido = (agora - inicio) % (VOO_MS + PAUSA_MS);
+        if (decorrido >= VOO_MS) {
+          voo.marcador.setOpacity(0);               // pousou: espera e decola
+        } else {
+          const p = decorrido / VOO_MS;
+          // Acelera na decolagem e desacelera no pouso
+          const t = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+          // Surge na origem e some ao chegar ao destino
+          posicionarAviao(t, Math.max(0, Math.min(1, p / 0.08, (1 - p) / 0.12)));
+        }
+        voo.quadro = requestAnimationFrame(quadro);
+      };
+      voo.quadro = requestAnimationFrame(quadro);
+    }
+
+    function iniciarVoo(L, c) {
+      const marcador = L.marker(c.ponto(0.5), {
+        icon: L.divIcon({ className: "rota-aviao", html: SVG_AVIAO, iconSize: [30, 30], iconAnchor: [15, 15] }),
+        interactive: false, keyboard: false, zIndexOffset: 1000,
+      }).addTo(camada);
+      voo = { curva: c, marcador, svg: marcador.getElement().firstElementChild, quadro: null };
+      // Quem pede menos movimento no sistema vê o avião parado no meio da
+      // rota, ainda indicando o sentido da viagem.
+      const reduzir = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduzir) { voo.estatico = true; posicionarAviao(0.5, 1); return; }
+      rodarVoo();
     }
 
     function desenhar(L) {
+      pararVoo();
+      voo = null;
       camada.clearLayers();
       const pontos = [origem, destino].filter(Boolean);
       const mesmo = origem && destino && origem.uf === destino.uf && origem.nome === destino.nome;
@@ -411,7 +458,7 @@
         return w;
       };
 
-      // Rótulos do lado oposto à rota, para não cobrirem a seta
+      // Rótulos do lado oposto à rota, para não cobrirem o trajeto do avião
       const deslocar = (lado) => ({ left: [-9, 0], right: [9, 0], top: [0, -9], bottom: [0, 9] })[lado];
       let ladoO = "top", ladoD = "top"; // um ponto só: rótulo centrado acima
       if (origem && destino && !mesmo) {
@@ -437,12 +484,13 @@
       const rotulos = []; // { tip, lado } — medidos no enquadramento
       let pts = pontos.map((m) => L.latLng(m.lat, m.lng));
       if (origem && destino && !mesmo) {
-        pts = arco(L, origem, destino);
-        const linha = L.polyline(pts, {
-          color: COR.primaria, weight: 3, opacity: 0.9, dashArray: "8 7",
+        const c = curva(L, origem, destino);
+        pts = c.pts;
+        L.polyline(pts, {
+          color: COR.primaria, weight: 3, opacity: 0.75, dashArray: "8 7",
           lineCap: "round", interactive: false, noClip: true,
         }).addTo(camada);
-        aplicarSeta(linha);
+        iniciarVoo(L, c);
       }
       if (origem) {
         const mo = L.circleMarker([origem.lat, origem.lng], {
