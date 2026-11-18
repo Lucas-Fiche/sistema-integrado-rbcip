@@ -9,6 +9,7 @@
   <link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png" />
   <link rel="stylesheet" href="../assets/css/styles.css" />
   <link rel="stylesheet" href="../assets/css/admin.css" />
+  <link rel="stylesheet" href="../assets/css/acompanhamento.css" />
 </head>
 <body>
   <header class="brand-bar">
@@ -45,9 +46,25 @@
       </nav>
     </div>
 
-    <div class="filtros">
+    <!-- Filtros: uma linha acima de tudo; valem para todos os números da página -->
+    <section class="ac-filtros" aria-label="Filtros">
       <div class="campo">
-        <label>Formulário</label>
+        <label for="f-periodo">Período</label>
+        <select id="f-periodo">
+          <option value="tudo">Todo o período</option>
+          <option value="7">Últimos 7 dias</option>
+          <option value="30">Últimos 30 dias</option>
+          <option value="90">Últimos 90 dias</option>
+          <option value="mes">Este mês</option>
+          <option value="mes-anterior">Mês anterior</option>
+          <option value="ano">Este ano</option>
+          <option value="custom">Personalizado…</option>
+        </select>
+      </div>
+      <div class="campo ac-campo-datas" hidden><label for="f-de">De</label><input type="date" id="f-de" /></div>
+      <div class="campo ac-campo-datas" hidden><label for="f-ate">Até</label><input type="date" id="f-ate" /></div>
+      <div class="campo">
+        <label for="f-formulario">Formulário</label>
         <select id="f-formulario">
           <option value="">Todos</option>
           <option value="pagamentos">Pagamento</option>
@@ -56,12 +73,38 @@
           <option value="diarias-bolsistas">Diárias para Bolsistas</option>
         </select>
       </div>
-      <div class="campo"><label>De</label><input type="date" id="f-de" /></div>
-      <div class="campo"><label>Até</label><input type="date" id="f-ate" /></div>
-    </div>
+      <div class="campo">
+        <label for="f-status">Situação</label>
+        <select id="f-status">
+          <option value="">Todas</option>
+          <option value="abertas">Em aberto (não pagas nem rejeitadas)</option>
+          <option value="pendente">Pendente</option>
+          <option value="em_analise">Em análise</option>
+          <option value="aprovado">Aprovado</option>
+          <option value="pago">Pago</option>
+          <option value="rejeitado">Rejeitado</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="f-projeto">Projeto</label>
+        <select id="f-projeto"><option value="">Todos</option></select>
+      </div>
+      <div class="campo ac-campo-busca">
+        <label for="f-busca">Beneficiário</label>
+        <input type="search" id="f-busca" placeholder="Nome ou CPF" autocomplete="off" />
+      </div>
+      <div class="ac-filtros__acoes">
+        <button type="button" class="btn btn-secondary" id="f-limpar">Limpar filtros</button>
+        <button type="button" class="btn btn-secondary" id="f-atualizar">↻ Atualizar</button>
+      </div>
+    </section>
 
-    <section class="stats" id="stats"></section>
-    <section class="graficos" id="graficos"></section>
+    <div id="ac-conteudo">
+      <p class="ac-recorte" id="ac-recorte" aria-live="polite"></p>
+      <section class="ac-kpis" id="ac-kpis" aria-label="Indicadores"></section>
+      <div id="ac-alertas"></div>
+      <div class="ac-grade" id="ac-grade"></div>
+    </div>
   </main>
 
   <footer class="site-footer">Sistema de Solicitações - RBCIP · v1.4</footer>
