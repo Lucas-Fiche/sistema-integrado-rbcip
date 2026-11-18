@@ -425,6 +425,20 @@ input:focus, textarea:focus, select:focus {
   box-shadow: 0 0 0 4px rgba(31, 102, 141, 0.14);
 }
 textarea { min-height: 112px; resize: vertical; line-height: 1.5; }
+/* iPhone (Safari): o campo de data tem largura mínima própria e ignora
+   width:100% — vazava do cartão no celular. appearance:none devolve o
+   controle do tamanho (a mesma correção já usada nos filtros do painel)
+   e o texto volta para a esquerda, que o iOS centraliza. O min-height
+   acima evita que o campo vazio encolha no iOS. */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
 select {
   appearance: none;
   -webkit-appearance: none;
